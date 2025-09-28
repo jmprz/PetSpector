@@ -1,7 +1,7 @@
 name: petspector
 description: "A new Flutter project."
 publish_to: 'none'
-version: 0.1.0
+version: 1.0.0
 
 environment:
   sdk: ^3.9.2
@@ -15,14 +15,39 @@ dependencies:
   tflite_flutter: ^0.10.4
   sqflite: ^2.3.2
   path_provider: ^2.1.2
+  shared_preferences: ^2.2.3
+  google_sign_in: ^6.1.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
 
   assets:
+    - assets/images/ps_icon.png
     - assets/images/ps_logo.png
+    - assets/images/google_logo.png
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+        - asset: assets/fonts/Poppins-Medium.ttf
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  windows:
+    generate: true
+  macos:
+    generate: true
+  linux:
+    generate: true
+  image_path: "assets/images/ps_icon.png"
+  remove_alpha_ios: true
+
