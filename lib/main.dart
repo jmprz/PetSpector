@@ -2,8 +2,24 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'screens/signup_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'screens/home_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  await Firebase.initializeApp();
+
+  await Supabase.initialize(
+    url: 'https://govzimwgnmnkbnmczjit.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdnppbXdnbm1ua2JubWN6aml0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk3NDY1NTUsImV4cCI6MjA3NTMyMjU1NX0.BwISyFohqBq-69Ot1ZopDGD8jU2HGhtXAB4jMyCv1VA',
+  );
+
   runApp(PetSpectorApp());
 }
 
@@ -101,21 +117,118 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
+  @override
+  _LoginScreenState createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  void _handleGoogleSignIn(BuildContext context) async {
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  Future<void> _loginWithEmail() async {
+    setState(() => _isLoading = true);
+
     try {
-      final account = await _googleSignIn.signIn();
-      if (account != null) {
+      final userCredential = await _auth.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      final user = userCredential.user;
+
+      if (user != null && user.emailVerified) {
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Signed in as ${account.displayName}")),
+          const SnackBar(
+            content: Text('Please verify your email before logging in.'),
+            backgroundColor: Colors.red,
+          ),
         );
+        await _auth.signOut();
       }
-    } catch (error) {
-      print(error);
+    } on FirebaseAuthException catch (e) {
+      String errorMessage;
+      switch (e.code) {
+        case 'user-not-found':
+          errorMessage = 'No user found with this email.';
+          break;
+        case 'wrong-password':
+          errorMessage = 'Incorrect password.';
+          break;
+        case 'invalid-email':
+          errorMessage = 'Invalid email address format.';
+          break;
+        default:
+          errorMessage = 'Login failed. Please try again.';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Google Sign-In failed")),
+        SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final email = _emailController.text.trim();
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please enter your email to reset password."),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Password reset email sent! Check your inbox."),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Failed to send reset email. Try again."),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _loginWithGoogle() async {
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return;
+
+      final googleAuth = await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      await _auth.signInWithCredential(credential);
+
+      Navigator.pushReplacementNamed(context, '/home');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Google Sign-In failed"),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -124,8 +237,8 @@ class LoginScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -139,68 +252,86 @@ class LoginScreen extends StatelessWidget {
               ),
               const SizedBox(height: 30),
 
-              // Email Field
               TextField(
-                decoration: InputDecoration(
+                controller: _emailController,
+                decoration: const InputDecoration(
                   labelText: "Email",
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 15),
 
-              // Password Field
               TextField(
-                obscureText: true,
+                controller: _passwordController,
+                obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   labelText: "Password",
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    },
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 10),
 
-              // Login Button
-              ElevatedButton(
-                onPressed: () {
-                  // TODO: Add login logic
-                },
-                style: ElevatedButton.styleFrom(
-                  minimumSize: Size(double.infinity, 50),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _resetPassword,
+                  child: const Text(
+                    "Forgot Password?",
+                    style: TextStyle(color: Colors.blueAccent),
+                  ),
                 ),
-                child: Text("Login"),
               ),
+              const SizedBox(height: 10),
+
+              _isLoading
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                      onPressed: _loginWithEmail,
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                      ),
+                      child: const Text("Login"),
+                    ),
 
               const SizedBox(height: 15),
 
-              // Sign Up Button
               OutlinedButton(
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => SignUpScreen()),
+                    MaterialPageRoute(builder: (_) => SignUpPage()),
                   );
                 },
                 style: OutlinedButton.styleFrom(
-                  minimumSize: Size(double.infinity, 50),
+                  minimumSize: const Size(double.infinity, 50),
                 ),
-                child: Text("Sign Up"),
+                child: const Text("Sign Up"),
               ),
 
               const SizedBox(height: 20),
 
-              // Google Sign-In
               ElevatedButton.icon(
                 icon: Image.asset(
-                  'assets/images/google_logo.png', // Add google logo in assets
+                  'assets/images/google_logo.png',
                   height: 24,
-                  width: 24,
                 ),
-                label: Text("Continue with Google"),
-                onPressed: () => _handleGoogleSignIn(context),
+                label: const Text("Continue with Google"),
+                onPressed: _loginWithGoogle,
                 style: ElevatedButton.styleFrom(
-                  minimumSize: Size(double.infinity, 50),
+                  minimumSize: const Size(double.infinity, 50),
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black,
-                  side: BorderSide(color: Colors.grey),
+                  side: const BorderSide(color: Colors.grey),
                 ),
               ),
             ],
@@ -211,18 +342,7 @@ class LoginScreen extends StatelessWidget {
   }
 }
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Text(
-          "Home Screen (Logged in)",
-          style: TextStyle(fontSize: 20),
-        ),
-      ),
-    );
-  }
-}
+ 
+
+

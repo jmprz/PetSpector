@@ -1,4 +1,4 @@
-package com.example.petspector
+package com.jmprz.petspector
 
 import io.flutter.embedding.android.FlutterActivity
 
