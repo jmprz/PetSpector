@@ -11,29 +11,32 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.2
-  image_picker: ^1.0.7
-  tflite_flutter: ^0.10.4
+  image_picker: ^1.2.0
+  tflite_flutter: ^0.11.0
   sqflite: ^2.3.2
   path_provider: ^2.1.2
   shared_preferences: ^2.2.3
-  google_sign_in: ^6.1.4
-   # Firebase core
+  google_sign_in: ^7.2.0
+  
+  # Firebase
   firebase_core: ^3.6.0
-  # Firebase Authentication
-  firebase_auth: ^5.3.1
-  cloud_firestore: ^5.6.12 # if you need a database
-  flutter_native_splash: ^2.4.1
+  firebase_auth: ^5.3.3
+  cloud_firestore: ^5.4.4
   firebase_storage: ^12.3.3
+  
+  # Supabase
   supabase_flutter: ^2.0.0
 
+  # Camera
+  camera: ^0.11.2
 
-
+  flutter_native_splash: ^2.4.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
-  flutter_launcher_icons: ^0.13.1
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -42,6 +45,7 @@ flutter:
     - assets/images/ps_icon.png
     - assets/images/ps_logo.png
     - assets/images/google_logo.png
+
   fonts:
     - family: Poppins
       fonts:
@@ -51,11 +55,11 @@ flutter:
           weight: 700
 
 flutter_native_splash:
-  color: "#ffffff"            # background color of your splash screen
-  image: assets/images/ps_icon.png   # path to your splash logo
+  color: "#ffffff"
+  image: assets/images/ps_icon.png
   android: true
   ios: true
-  web: true      
+  web: true
 
 flutter_launcher_icons:
   android: true
@@ -68,6 +72,3 @@ flutter_launcher_icons:
     generate: true
   image_path: "assets/images/ps_icon.png"
   remove_alpha_ios: true
-
-
-

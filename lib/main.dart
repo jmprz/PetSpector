@@ -1,29 +1,47 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'screens/signup_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+// Retaining the prefix 'fb_auth' to prevent the conflict with Supabase's 'User' class
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth; 
 import 'screens/home_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:camera/camera.dart'; 
+import 'screens/cam_scan_screen.dart'; // NEW: Import the camera screen
 
+// Global variable to store the list of available cameras
+List<CameraDescription> cameras = [];
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Firebase
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
+  // Initialize Supabase
   await Supabase.initialize(
     url: 'https://govzimwgnmnkbnmczjit.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdnppbXdnbm1ua2JubWN6aml0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk3NDY1NTUsImV4cCI6MjA3NTMyMjU1NX0.BwISyFohqBq-69Ot1ZopDGD8jU2HGhtXAB4jMyCv1VA',
   );
+  
+  // Initialize cameras (needed for CamScanScreen)
+  try {
+    cameras = await availableCameras();
+  } on CameraException catch (e) {
+    debugPrint('Error getting available cameras: $e');
+    // Initialize to empty list on error to prevent runtime crash
+    cameras = [];
+  }
 
-  runApp(PetSpectorApp());
+  runApp(const PetSpectorApp());
 }
 
 class PetSpectorApp extends StatelessWidget {
+  const PetSpectorApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -33,52 +51,43 @@ class PetSpectorApp extends StatelessWidget {
         fontFamily: 'Poppins', // font for the app
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF3F7795),
+        ).copyWith(
+          // Ensure primary color is used across the app
+          primary: const Color(0xFF3F7795),
         ),
       ),
       debugShowCheckedModeBanner: false,
-      home: SplashScreen(),
+      // Use the prefixed User object (fb_auth.User) to check authentication state
+      home: StreamBuilder<fb_auth.User?>( 
+        stream: fb_auth.FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          // Show splash screen while checking auth state
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const SplashScreen();
+          }
+          // If user is logged in, go to home screen, otherwise go to login
+          if (snapshot.hasData && snapshot.data != null) {
+            return const HomeScreen();
+          }
+          return const LoginScreen();
+        },
+      ),
       routes: {
-        '/login': (context) => LoginScreen(),
+        '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
+        '/signup': (context) => SignUpPage(),
+        '/scan': (context) => const CamScanScreen(), // NEW ROUTE
       },
     );
   }
 }
 
-class SplashScreen extends StatefulWidget {
-  @override
-  _SplashScreenState createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _navigateToLogin();
-  }
-
-  Future<void> _navigateToLogin() async {
-    await Future.delayed(const Duration(seconds: 3)); // splash duration
-
-    if (!mounted) return;
-
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            LoginScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(
-            opacity: animation,
-            child: child,
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 800),
-      ),
-    );
-  }
-
+class SplashScreen extends StatelessWidget {
+  const SplashScreen({super.key});
+  
   @override
   Widget build(BuildContext context) {
+    // This splash screen now acts as the loading screen while checking Firebase state
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
@@ -86,6 +95,7 @@ class _SplashScreenState extends State<SplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Logo
+            // NOTE: Ensure 'assets/images/ps_icon.png' exists in your assets folder
             Image.asset(
               'assets/images/ps_icon.png',
               height: 120,
@@ -110,6 +120,10 @@ class _SplashScreenState extends State<SplashScreen> {
                 color: Colors.grey[600],
               ),
             ),
+            const SizedBox(height: 40),
+            const CircularProgressIndicator(
+              color: Color(0xFF3F7795),
+            ),
           ],
         ),
       ),
@@ -118,16 +132,18 @@ class _SplashScreenState extends State<SplashScreen> {
 }
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+  
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
-
+  // Use prefixed FirebaseAuth
+  final _auth = fb_auth.FirebaseAuth.instance; 
+  
   bool _isLoading = false;
   bool _obscurePassword = true;
 
@@ -142,9 +158,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final user = userCredential.user;
 
+      // Check for email verification, and allow login to proceed if verified
       if (user != null && user.emailVerified) {
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/home');
       } else {
+        // If not verified, sign out and prompt user
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please verify your email before logging in.'),
@@ -153,7 +172,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
         await _auth.signOut();
       }
-    } on FirebaseAuthException catch (e) {
+    } on fb_auth.FirebaseAuthException catch (e) { // Use prefixed FirebaseAuthException
       String errorMessage;
       switch (e.code) {
         case 'user-not-found':
@@ -181,6 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _emailController.text.trim();
 
     if (email.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Please enter your email to reset password."),
@@ -192,6 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await _auth.sendPasswordResetEmail(email: email);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Password reset email sent! Check your inbox."),
@@ -199,34 +220,10 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Failed to send reset email. Try again."),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _loginWithGoogle() async {
-    try {
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return;
-
-      final googleAuth = await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      await _auth.signInWithCredential(credential);
-
-      Navigator.pushReplacementNamed(context, '/home');
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Google Sign-In failed"),
           backgroundColor: Colors.red,
         ),
       );
@@ -299,41 +296,34 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: _loginWithEmail,
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 50),
+                        backgroundColor: const Color(0xFF3F7795),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                      child: const Text("Login"),
+                      child: const Text("Login", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
 
               const SizedBox(height: 15),
 
               OutlinedButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => SignUpPage()),
-                  );
+                  // Use the named route for sign up
+                  Navigator.pushNamed(context, '/signup');
                 },
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),
+                  foregroundColor: const Color(0xFF3F7795),
+                  side: const BorderSide(color: Color(0xFF3F7795)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-                child: const Text("Sign Up"),
+                child: const Text("Sign Up", style: TextStyle(fontSize: 16)),
               ),
 
               const SizedBox(height: 20),
-
-              ElevatedButton.icon(
-                icon: Image.asset(
-                  'assets/images/google_logo.png',
-                  height: 24,
-                ),
-                label: const Text("Continue with Google"),
-                onPressed: _loginWithGoogle,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
-                  side: const BorderSide(color: Colors.grey),
-                ),
-              ),
             ],
           ),
         ),
@@ -341,8 +331,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
-
- 
-
-
