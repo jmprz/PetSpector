@@ -19,10 +19,10 @@ dependencies:
   google_sign_in: ^7.2.0
   
   # Firebase
-  firebase_core: ^3.6.0
-  firebase_auth: ^5.3.3
-  cloud_firestore: ^5.4.4
-  firebase_storage: ^12.3.3
+  firebase_core: ^4.2.0
+  firebase_auth: ^6.1.1
+  cloud_firestore: ^6.0.3
+  firebase_storage: ^13.0.3
   
   # Supabase
   supabase_flutter: ^2.0.0
@@ -31,11 +31,13 @@ dependencies:
   camera: ^0.11.2
 
   flutter_native_splash: ^2.4.1
+  image: ^4.2.0
+
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
 
 flutter:
@@ -45,6 +47,7 @@ flutter:
     - assets/images/ps_icon.png
     - assets/images/ps_logo.png
     - assets/images/google_logo.png
+    - assets/mobilenet_v2.tflite
 
   fonts:
     - family: Poppins

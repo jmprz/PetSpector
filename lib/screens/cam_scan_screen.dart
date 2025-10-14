@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import '../main.dart'; // Import main to access the global 'cameras' list
+import 'package:supabase_flutter/supabase_flutter.dart'; // Add this for Supabase
+import '../main.dart'; // Access global camera list
+import '../utils/breed_detector.dart';
+
 
 class CamScanScreen extends StatefulWidget {
   const CamScanScreen({super.key});
@@ -12,45 +15,58 @@ class CamScanScreen extends StatefulWidget {
 }
 
 class _CamScanScreenState extends State<CamScanScreen> {
-  // These are marked 'late' and initialized synchronously in initState.
   late CameraController _cameraController;
   late Future<void> _initializeControllerFuture;
-  
-  // State variables for managing selected image and processing status
+
+  final BreedDetector _breedDetector = BreedDetector();
+
+
   File? _selectedImage;
   bool _isProcessing = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _initializeCamera();
-  }
+  final SupabaseClient supabase = Supabase.instance.client;
+
+bool _isModelLoaded = false;
+
+@override
+void initState() {
+  super.initState();
+  _initializeCamera();
+
+  // Load model safely
+  _breedDetector.loadModel().then((_) async {
+    await Future.delayed(const Duration(seconds: 3)); // Add delay to ensure model is ready
+    if (mounted) {
+      setState(() => _isModelLoaded = true);
+      debugPrint("✅ Model fully loaded and ready!");
+    }
+  }).catchError((e) {
+    debugPrint("❌ Model load failed: $e");
+  });
+}
+
+
+
 
   void _initializeCamera() {
-    // Check if cameras list is populated from main.dart
     if (cameras.isEmpty) {
       debugPrint("No cameras available.");
-      // We can create a dummy completed future if no camera is available
       _initializeControllerFuture = Future.value();
       return;
     }
 
-    // Initialize the controller with the first available camera
     _cameraController = CameraController(
       cameras[0],
       ResolutionPreset.medium,
       enableAudio: false,
     );
 
-    // Store the initialization Future and update state when complete
     _initializeControllerFuture = _cameraController.initialize().then((_) {
       if (!mounted) return;
       setState(() {});
     }).catchError((e) {
       debugPrint("Camera initialization error: $e");
-      // Handle permission errors or other initialization issues
       if (e is CameraException) {
-        // Optionally show a user-friendly error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Camera error: ${e.description}')),
         );
@@ -58,90 +74,101 @@ class _CamScanScreenState extends State<CamScanScreen> {
     });
   }
 
-  // --- Photo Capture and Upload Methods ---
-
-  // 1. Capture photo from the active camera feed
-  Future<void> _takePicture() async {
-    // Ensure the controller is initialized before attempting to take a picture
-    try {
-      await _initializeControllerFuture;
-      if (!_cameraController.value.isInitialized) {
-        throw Exception("Camera controller not initialized.");
-      }
-      
-      setState(() {
-        _isProcessing = true;
-      });
-
-      final XFile image = await _cameraController.takePicture();
-      
-      if (!mounted) return;
-      
-      // Update state with the captured image path
-      setState(() {
-        _selectedImage = File(image.path);
-        _isProcessing = false;
-      });
-      
-      // Navigate to the analysis screen with the captured image
-      _navigateToAnalysis(File(image.path));
-      
-    } catch (e) {
-      debugPrint(e.toString());
-      if (!mounted) return;
-      setState(() {
-        _isProcessing = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to take picture. Ensure permissions are granted.')),
-      );
-    }
-  }
-
-  // 2. Pick image from device gallery
-  Future<void> _pickImageFromGallery() async {
-    final ImagePicker picker = ImagePicker();
-    try {
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-
-      if (image != null) {
-        if (!mounted) return;
-        setState(() {
-          _selectedImage = File(image.path);
-        });
-        // Navigate to the analysis screen with the selected image
-        _navigateToAnalysis(File(image.path));
-      }
-    } catch (e) {
-      debugPrint(e.toString());
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to pick image from gallery. Check storage permissions.')),
-      );
-    }
-  }
-
-  // --- Next Step: Analysis and Navigation ---
-
-  void _navigateToAnalysis(File imageFile) {
-    // TODO: This is where you will implement the navigation to your result screen
-    // For now, we'll just show a confirmation.
-    
-    // Example of a temporary confirmation message:
+ // --- Capture photo from camera ---
+Future<void> _takePicture() async {
+  if (!_isModelLoaded) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Image captured/selected: ${imageFile.path.split('/').last}. Ready for AI scanning!')),
+      const SnackBar(content: Text('Model is still loading... please wait.')),
     );
-
-    // In a real app, you would navigate here:
-    // Navigator.push(context, MaterialPageRoute(
-    // 	builder: (context) => AnalysisResultScreen(image: imageFile),
-    // ));
+    return;
   }
 
+  try {
+    await _initializeControllerFuture;
+    final XFile image = await _cameraController.takePicture();
+    final file = File(image.path);
+
+    setState(() {
+      _isProcessing = true;
+      _selectedImage = file;
+    });
+
+    final prediction = await _breedDetector.predict(file);
+    print("🐶 Prediction success: ${prediction.take(5)}");
+
+    await _uploadImageToSupabase(file);
+  } catch (e) {
+    debugPrint("❌ Error taking picture: $e");
+  } finally {
+    setState(() => _isProcessing = false);
+  }
+}
+
+// --- Upload image from gallery ---
+Future<void> _pickImageFromGallery() async {
+  if (!_isModelLoaded) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Model is still loading... please wait.')),
+    );
+    return;
+  }
+
+  final picker = ImagePicker();
+  final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+  if (image == null) return;
+
+  final file = File(image.path);
+
+  setState(() {
+    _isProcessing = true;
+    _selectedImage = file;
+  });
+
+  try {
+    final prediction = await _breedDetector.predict(file);
+    print("🐶 Prediction success: ${prediction.take(5)}");
+    await _uploadImageToSupabase(file);
+  } catch (e) {
+    debugPrint("❌ Error uploading image: $e");
+  } finally {
+    setState(() => _isProcessing = false);
+  }
+}
+
+  // --- Upload image to Supabase Storage ---
+  Future<void> _uploadImageToSupabase(File file) async {
+    try {
+      final fileName = 'scan_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileBytes = await file.readAsBytes();
+
+      // Upload to your Supabase Storage bucket (e.g. 'captures')
+      final response = await supabase.storage
+          .from('pet_uploads') // Change this to your bucket name
+          .uploadBinary(
+            'uploads/$fileName',
+            fileBytes,
+            fileOptions: const FileOptions(contentType: 'image/jpeg'),
+          );
+
+      if (response.isEmpty) {
+        throw Exception("Upload failed: Empty response");
+      }
+
+      // Get public URL
+      final publicUrl =
+          supabase.storage.from('pet_uploads').getPublicUrl('uploads/$fileName');
+      debugPrint('✅ Uploaded image URL: $publicUrl');
+    } catch (e) {
+      debugPrint('❌ Supabase upload error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload failed: $e')),
+      );
+    }
+  }
 
   @override
   void dispose() {
-    // Safely dispose the controller
     _cameraController.dispose();
     super.dispose();
   }
@@ -157,66 +184,57 @@ class _CamScanScreenState extends State<CamScanScreen> {
       body: Center(
         child: Column(
           children: [
-            // --- Camera Preview / Image Display Area ---
             Expanded(
               child: FutureBuilder<void>(
                 future: _initializeControllerFuture,
                 builder: (context, snapshot) {
-                  // Check if a camera is physically available AND the future is done
-                  if (cameras.isNotEmpty && snapshot.connectionState == ConnectionState.done) {
-                    // Check if controller is fully initialized
+                  if (cameras.isNotEmpty &&
+                      snapshot.connectionState == ConnectionState.done) {
                     if (_cameraController.value.isInitialized) {
-                       // Display the Camera Preview, fitting it into the available space
                       return CameraPreview(_cameraController);
                     } else {
-                      // Controller initialized future is done, but controller state is bad (e.g. permission denied)
                       return const Center(
-                        child: Text("Camera not available or initialized.", textAlign: TextAlign.center)
-                      );
+                          child: Text("Camera not available or initialized."));
                     }
                   } else if (cameras.isEmpty) {
-                    // If no camera is found
                     return const Center(
                       child: Padding(
                         padding: EdgeInsets.all(32.0),
-                        child: Text("No camera detected on device. Please use 'Upload from Gallery'.", textAlign: TextAlign.center),
-                      )
+                        child: Text(
+                          "No camera detected. Please use 'Upload from Gallery'.",
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     );
                   } else {
-                    // Otherwise, display a loading indicator while waiting for the Future.
                     return const Center(child: CircularProgressIndicator());
                   }
                 },
               ),
             ),
-
-            // --- Capture/Upload Buttons ---
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
-                  if (_isProcessing)
-                    const LinearProgressIndicator(),
-                    
-                  // Capture Button
+                  if (_isProcessing) const LinearProgressIndicator(),
                   ElevatedButton.icon(
-                    onPressed: _isProcessing || cameras.isEmpty || !_cameraController.value.isInitialized ? null : _takePicture,
+                    onPressed: _isProcessing ||
+                            cameras.isEmpty ||
+                            !_cameraController.value.isInitialized
+                        ? null
+                        : _takePicture,
                     icon: const Icon(Icons.camera_alt),
-                    label: const Text('Capture for Scan'),
+                    label: const Text('Capture & Upload'),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 50),
                       backgroundColor: const Color(0xFF3F7795),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                          borderRadius: BorderRadius.circular(10)),
                       elevation: 5,
                     ),
                   ),
-                  
                   const SizedBox(height: 15),
-
-                  // Upload Button (From Gallery)
                   OutlinedButton.icon(
                     onPressed: _isProcessing ? null : _pickImageFromGallery,
                     icon: const Icon(Icons.upload_file),
@@ -226,11 +244,9 @@ class _CamScanScreenState extends State<CamScanScreen> {
                       foregroundColor: const Color(0xFF3F7795),
                       side: const BorderSide(color: Color(0xFF3F7795), width: 2),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                          borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
-                  
                 ],
               ),
             ),
