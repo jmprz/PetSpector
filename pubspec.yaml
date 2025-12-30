@@ -24,8 +24,6 @@ dependencies:
   cloud_firestore: ^6.0.3
   firebase_storage: ^13.0.3
   
-  # Supabase
-  supabase_flutter: ^2.0.0
 
   # Camera
   camera: ^0.11.2

@@ -6,7 +6,6 @@ import 'firebase_options.dart';
 // Retaining the prefix 'fb_auth' to prevent the conflict with Supabase's 'User' class
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth; 
 import 'screens/home_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:camera/camera.dart'; 
 import 'screens/cam_scan_screen.dart'; // NEW: Import the camera screen
 
@@ -21,11 +20,6 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Initialize Supabase
-  await Supabase.initialize(
-    url: 'https://govzimwgnmnkbnmczjit.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdnppbXdnbm1ua2JubWN6aml0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk3NDY1NTUsImV4cCI6MjA3NTMyMjU1NX0.BwISyFohqBq-69Ot1ZopDGD8jU2HGhtXAB4jMyCv1VA',
-  );
   
   // Initialize cameras (needed for CamScanScreen)
   try {

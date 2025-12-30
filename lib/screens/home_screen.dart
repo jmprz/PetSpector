@@ -252,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
     String screenTitle = '';
     switch (_selectedIndex) {
       case 0:
-        screenTitle = 'PetSpector Dashboard';
+        screenTitle = 'Dashboard';
         break;
       case 1:
         screenTitle = 'Scan Pet Condition';
@@ -268,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(screenTitle),
-        backgroundColor: const Color(0xFF3F7795), // Using your app's primary color
+        backgroundColor: const Color(0xFFFFFFFF), // Using your app's primary color
         elevation: 0,
       ),
       body: tabs[_selectedIndex],

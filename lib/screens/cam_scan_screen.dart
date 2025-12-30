@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Add this for Supabase
-import '../main.dart'; // Access global camera list
-import '../utils/breed_detector.dart';
 
+import '../main.dart';
+import '../utils/breed_detector.dart';
 
 class CamScanScreen extends StatefulWidget {
   const CamScanScreen({super.key});
@@ -19,38 +20,28 @@ class _CamScanScreenState extends State<CamScanScreen> {
   late Future<void> _initializeControllerFuture;
 
   final BreedDetector _breedDetector = BreedDetector();
-
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   File? _selectedImage;
   bool _isProcessing = false;
+  bool _isModelLoaded = false;
 
-  final SupabaseClient supabase = Supabase.instance.client;
+  @override
+  void initState() {
+    super.initState();
+    _initializeCamera();
 
-bool _isModelLoaded = false;
-
-@override
-void initState() {
-  super.initState();
-  _initializeCamera();
-
-  // Load model safely
-  _breedDetector.loadModel().then((_) async {
-    await Future.delayed(const Duration(seconds: 3)); // Add delay to ensure model is ready
-    if (mounted) {
-      setState(() => _isModelLoaded = true);
-      debugPrint("✅ Model fully loaded and ready!");
-    }
-  }).catchError((e) {
-    debugPrint("❌ Model load failed: $e");
-  });
-}
-
-
-
+    _breedDetector.loadModel().then((_) async {
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        setState(() => _isModelLoaded = true);
+      }
+    });
+  }
 
   void _initializeCamera() {
     if (cameras.isEmpty) {
-      debugPrint("No cameras available.");
       _initializeControllerFuture = Future.value();
       return;
     }
@@ -61,29 +52,10 @@ void initState() {
       enableAudio: false,
     );
 
-    _initializeControllerFuture = _cameraController.initialize().then((_) {
-      if (!mounted) return;
-      setState(() {});
-    }).catchError((e) {
-      debugPrint("Camera initialization error: $e");
-      if (e is CameraException) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Camera error: ${e.description}')),
-        );
-      }
-    });
+    _initializeControllerFuture = _cameraController.initialize();
   }
 
- // --- Capture photo from camera ---
-Future<void> _takePicture() async {
-  if (!_isModelLoaded) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Model is still loading... please wait.')),
-    );
-    return;
-  }
-
-  try {
+  Future<void> _takePicture() async {
     await _initializeControllerFuture;
     final XFile image = await _cameraController.takePicture();
     final file = File(image.path);
@@ -93,78 +65,79 @@ Future<void> _takePicture() async {
       _selectedImage = file;
     });
 
-    final prediction = await _breedDetector.predict(file);
-    print("🐶 Prediction success: ${prediction.take(5)}");
-
-    await _uploadImageToSupabase(file);
-  } catch (e) {
-    debugPrint("❌ Error taking picture: $e");
-  } finally {
-    setState(() => _isProcessing = false);
-  }
-}
-
-// --- Upload image from gallery ---
-Future<void> _pickImageFromGallery() async {
-  if (!_isModelLoaded) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Model is still loading... please wait.')),
-    );
-    return;
-  }
-
-  final picker = ImagePicker();
-  final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-
-  if (image == null) return;
-
-  final file = File(image.path);
-
-  setState(() {
-    _isProcessing = true;
-    _selectedImage = file;
-  });
-
-  try {
-    final prediction = await _breedDetector.predict(file);
-    print("🐶 Prediction success: ${prediction.take(5)}");
-    await _uploadImageToSupabase(file);
-  } catch (e) {
-    debugPrint("❌ Error uploading image: $e");
-  } finally {
-    setState(() => _isProcessing = false);
-  }
-}
-
-  // --- Upload image to Supabase Storage ---
-  Future<void> _uploadImageToSupabase(File file) async {
     try {
-      final fileName = 'scan_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final fileBytes = await file.readAsBytes();
+      // Start the upload immediately
+      await _uploadImageToFirebase(file);
 
-      // Upload to your Supabase Storage bucket (e.g. 'captures')
-      final response = await supabase.storage
-          .from('pet_uploads') // Change this to your bucket name
-          .uploadBinary(
-            'uploads/$fileName',
-            fileBytes,
-            fileOptions: const FileOptions(contentType: 'image/jpeg'),
-          );
-
-      if (response.isEmpty) {
-        throw Exception("Upload failed: Empty response");
+      // Attempt prediction separately
+      if (_breedDetector.isLoaded) {
+        await _breedDetector.predict(file);
+      } else {
+        debugPrint(
+          "Model still loading, skipped prediction but upload successful.",
+        );
       }
-
-      // Get public URL
-      final publicUrl =
-          supabase.storage.from('pet_uploads').getPublicUrl('uploads/$fileName');
-      debugPrint('✅ Uploaded image URL: $publicUrl');
     } catch (e) {
-      debugPrint('❌ Supabase upload error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload failed: $e')),
-      );
+      debugPrint("An error occurred: $e");
+    } finally {
+      setState(() => _isProcessing = false);
     }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image == null) return; // User cancelled the picker
+
+    final file = File(image.path);
+
+    setState(() {
+      _isProcessing = true;
+      _selectedImage = file;
+    });
+
+    try {
+      // 1. Upload to Firebase FIRST (Essential)
+      await _uploadImageToFirebase(file);
+      debugPrint("Gallery image uploaded successfully.");
+
+      // 2. Run Prediction SECOND (Optional/Try-Catch)
+      if (_isModelLoaded) {
+        final results = await _breedDetector.predict(file);
+        debugPrint("Prediction Results: $results");
+      } else {
+        debugPrint("Model not ready for prediction yet.");
+      }
+    } catch (e) {
+      debugPrint("Error during gallery upload/process: $e");
+      // Show user feedback
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  Future<void> _uploadImageToFirebase(File file) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final fileName = 'scan_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    final ref = _storage
+        .ref()
+        .child('pet_uploads')
+        .child(user.uid)
+        .child(fileName);
+
+    await ref.putFile(file);
+    final downloadUrl = await ref.getDownloadURL();
+
+    debugPrint('✅ Firebase Image URL: $downloadUrl');
   }
 
   @override
@@ -179,79 +152,53 @@ Future<void> _pickImageFromGallery() async {
       appBar: AppBar(
         title: const Text('Scan or Upload Sample'),
         backgroundColor: const Color(0xFF3F7795),
-        foregroundColor: Colors.white,
       ),
-      body: Center(
-        child: Column(
-          children: [
-            Expanded(
-              child: FutureBuilder<void>(
-                future: _initializeControllerFuture,
-                builder: (context, snapshot) {
-                  if (cameras.isNotEmpty &&
-                      snapshot.connectionState == ConnectionState.done) {
-                    if (_cameraController.value.isInitialized) {
-                      return CameraPreview(_cameraController);
-                    } else {
-                      return const Center(
-                          child: Text("Camera not available or initialized."));
-                    }
-                  } else if (cameras.isEmpty) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: Text(
-                          "No camera detected. Please use 'Upload from Gallery'.",
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    );
-                  } else {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                },
-              ),
+      body: Column(
+        children: [
+          Expanded(
+            child: FutureBuilder(
+              future: _initializeControllerFuture,
+              builder: (_, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done &&
+                    _cameraController.value.isInitialized) {
+                  return CameraPreview(_cameraController);
+                }
+                return const Center(child: CircularProgressIndicator());
+              },
             ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                children: [
-                  if (_isProcessing) const LinearProgressIndicator(),
-                  ElevatedButton.icon(
-                    onPressed: _isProcessing ||
-                            cameras.isEmpty ||
-                            !_cameraController.value.isInitialized
-                        ? null
-                        : _takePicture,
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('Capture & Upload'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                      backgroundColor: const Color(0xFF3F7795),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      elevation: 5,
-                    ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                if (_isProcessing) const LinearProgressIndicator(),
+                // For the Capture Button
+                ElevatedButton.icon(
+                  onPressed: (_isProcessing || !_isModelLoaded)
+                      ? null
+                      : _takePicture,
+                  icon: const Icon(Icons.camera_alt),
+                  label: Text(
+                    _isModelLoaded ? 'Capture & Upload' : 'Loading Model...',
                   ),
-                  const SizedBox(height: 15),
-                  OutlinedButton.icon(
-                    onPressed: _isProcessing ? null : _pickImageFromGallery,
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Upload from Gallery'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                      foregroundColor: const Color(0xFF3F7795),
-                      side: const BorderSide(color: Color(0xFF3F7795), width: 2),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // For the Gallery Button
+                OutlinedButton.icon(
+                  onPressed: (_isProcessing || !_isModelLoaded)
+                      ? null
+                      : _pickImageFromGallery,
+                  icon: const Icon(Icons.upload),
+                  label: Text(
+                    _isModelLoaded ? 'Upload from Gallery' : 'Please wait...',
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
