@@ -8,11 +8,13 @@ import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'screens/home_screen.dart';
 import 'package:camera/camera.dart'; 
 import 'screens/cam_scan_screen.dart'; // NEW: Import the camera screen
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // Global variable to store the list of available cameras
 List<CameraDescription> cameras = [];
 
 Future<void> main() async {
+  await dotenv.load(fileName: ".env"); // Load the file
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Firebase

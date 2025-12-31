@@ -2,12 +2,16 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data'; // Added this import for Uint8List
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class BreedDetector {
-  final String _apiKey = "api-key-goes-here";
+  final String _apiKey = dotenv.env['GEMINI_API_KEY'] ?? "";
   late final GenerativeModel _model;
 
   BreedDetector() {
+    if (_apiKey.isEmpty) {
+      throw Exception("API Key not found in .env file");
+    }
     _model = GenerativeModel(
       model: 'gemini-2.5-flash', // Corrected version
       apiKey: _apiKey,
