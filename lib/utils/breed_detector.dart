@@ -1,54 +1,75 @@
 import 'dart:io';
-import 'package:tflite_flutter/tflite_flutter.dart';
-import 'package:image/image.dart' as img;
+import 'dart:convert';
+import 'dart:typed_data'; // Added this import for Uint8List
+import 'package:google_generative_ai/google_generative_ai.dart';
 
 class BreedDetector {
-  late Interpreter _interpreter;
-  bool _isLoaded = false;
-Future<void> loadModel() async {
-  try {
-    print("⏳ Loading TFLite model...");
-    _interpreter = await Interpreter.fromAsset('mobilenet_v2.tflite');
-    _isLoaded = true;
-    print("✅ Model loaded successfully!");
-  } catch (e) {
-    print("❌ Model load failed: $e");
-  }
-}
+  final String _apiKey = "api-key-goes-here";
+  late final GenerativeModel _model;
 
-  bool get isLoaded => _isLoaded;
-
-  Future<List<double>> predict(File imageFile) async {
-    if (!_isLoaded) throw Exception("Model not loaded yet!");
-
-    final imageBytes = await imageFile.readAsBytes();
-    final image = img.decodeImage(imageBytes)!;
-    final resized = img.copyResize(image, width: 224, height: 224);
-
-    final input = List.generate(
-      1,
-      (_) => List.generate(
-        224,
-        (_) => List.generate(
-          224,
-          (_) => List.generate(3, (_) => 0.0),
-        ),
+  BreedDetector() {
+    _model = GenerativeModel(
+      model: 'gemini-2.5-flash', // Corrected version
+      apiKey: _apiKey,
+      generationConfig: GenerationConfig(
+        responseMimeType: 'application/json', // Keep this! It's better for apps
       ),
     );
+  }
 
-    for (int y = 0; y < 224; y++) {
-      for (int x = 0; x < 224; x++) {
-        final pixel = resized.getPixel(x, y);
-        input[0][y][x] = [
-          pixel.r / 255.0,
-          pixel.g / 255.0,
-          pixel.b / 255.0,
-        ];
+  Future<Map<String, dynamic>> predict(File imageFile) async {
+    try {
+      final Uint8List imageBytes = await imageFile.readAsBytes();
+
+      // We update the prompt to ask for JSON specifically
+      final prompt = TextPart("""
+        You are a Strict Pet Classifier. 
+        ALLOWED CATEGORIES: Cat, Dog, Tortoise, Saltwater Fish, Bird.
+
+        TASK:
+        1. Identify the breed and info.
+        2. If the image is not an animal or not in the categories, set "status" to "error".
+
+        RETURN JSON FORMAT ONLY:
+        {
+          "status": "success" or "error",
+          "message": "if error, explain why",
+          "breed": "Name",
+          "type": "Cat/Dog/Tortoise/Saltwater Fish/Bird",
+          "allergies": "List details",
+          "care": "Tip"
+        }
+      """);
+
+      final content = [
+        Content.multi([prompt, DataPart('image/jpeg', imageBytes)])
+      ];
+
+      final response = await _model.generateContent(content);
+      final String jsonText = response.text ?? "{}";
+
+      // 1. Convert the String response into a real Map
+      final Map<String, dynamic> data = jsonDecode(jsonText);
+
+      // 2. Handle the logical error we defined in the prompt
+      if (data['status'] == 'error') {
+        return _errorMap(data['message'] ?? "Not a supported pet.");
       }
-    }
 
-    final output = List.filled(1000, 0.0).reshape([1, 1000]);
-    _interpreter.run(input, output);
-    return output[0];
+      return data;
+    } catch (e) {
+      return _errorMap("Connection failed. Please try again.");
+    }
+  }
+
+  // Unified error map to keep your UI from crashing
+  Map<String, dynamic> _errorMap(String message) {
+    return {
+      'status': 'error',
+      'breed': 'N/A',
+      'type': 'Unknown',
+      'allergies': 'No known data.',
+      'care': message,
+    };
   }
 }
