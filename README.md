@@ -5,7 +5,7 @@ It utilizes **Google’s Gemini 2.5 Flash** multimodal AI to identify specific p
 
 
 ## 🌟 Project Overview
-Unlike traditional classifiers, PetSpector **Large Language Models (LLMs)** to provide contextual health data. The project focuses on five specific pet categories, ensuring highly accurate breed identification and critical safety information regarding allergies.
+Unlike traditional classifiers, PetSpector uses **Large Language Models (LLMs)** to provide contextual health data. The project focuses on five specific pet categories, ensuring highly accurate breed identification and critical safety information regarding allergies.
 
 ### Core Capabilities:
 * **Breed Identification:** Detects specific breeds for Dogs, Cats, Birds, Saltwater Fish, and Tortoises.
