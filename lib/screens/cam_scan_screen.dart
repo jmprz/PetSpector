@@ -18,9 +18,9 @@ class CamScanScreen extends StatefulWidget {
 class _CamScanScreenState extends State<CamScanScreen> {
   CameraController? _cameraController;
   Future<void>? _initializeControllerFuture;
-  
+
   final BreedDetector _breedDetector = BreedDetector();
-  int _selectedCameraIndex = 0; 
+  int _selectedCameraIndex = 0;
   File? _selectedImage;
   bool _isProcessing = false;
 
@@ -61,7 +61,7 @@ class _CamScanScreenState extends State<CamScanScreen> {
 
     try {
       final Map<String, dynamic> result = await _breedDetector.predict(file);
-      
+
       if (result['status'] != 'error') {
         await _saveScanToHistory(result, file);
       }
@@ -69,25 +69,31 @@ class _CamScanScreenState extends State<CamScanScreen> {
       if (mounted) {
         _showResultBottomSheet(result);
       }
-      
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: ${e.toString()}")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
   }
 
-  Future<void> _saveScanToHistory(Map<String, dynamic> result, File imageFile) async {
+  Future<void> _saveScanToHistory(
+    Map<String, dynamic> result,
+    File imageFile,
+  ) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     try {
-      String fileName = 'pet_uploads/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      UploadTask uploadTask = FirebaseStorage.instance.ref().child(fileName).putFile(imageFile);
+      String fileName =
+          'pet_uploads/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      UploadTask uploadTask = FirebaseStorage.instance
+          .ref()
+          .child(fileName)
+          .putFile(imageFile);
       TaskSnapshot snapshot = await uploadTask;
       String imageUrl = await snapshot.ref.getDownloadURL();
 
@@ -125,13 +131,19 @@ class _CamScanScreenState extends State<CamScanScreen> {
           children: [
             Container(
               margin: const EdgeInsets.only(top: 12),
-              height: 5, width: 50,
-              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+              height: 5,
+              width: 50,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
-                child: isError ? _buildErrorView(data) : _buildSuccessView(data),
+                child: isError
+                    ? _buildErrorView(data)
+                    : _buildSuccessView(data),
               ),
             ),
           ],
@@ -152,31 +164,88 @@ class _CamScanScreenState extends State<CamScanScreen> {
             padding: const EdgeInsets.only(bottom: 20),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: Image.file(_selectedImage!, height: 250, width: double.infinity, fit: BoxFit.cover),
+              child: Image.file(
+                _selectedImage!,
+                height: 250,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
-        Text(data['breed'] ?? 'Unknown Breed', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-        Text((data['type'] ?? 'Pet').toString().toUpperCase(), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.blueGrey[300])),
+        Text(
+          data['breed'] ?? 'Unknown Breed',
+          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+        ),
+        Text(
+          (data['type'] ?? 'Pet').toString().toUpperCase(),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.blueGrey[300],
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.only(top: 8.0),
-          child: Text(data['description'] ?? "", style: TextStyle(fontSize: 15, color: Colors.grey[700], fontStyle: FontStyle.italic)),
+          child: Text(
+            data['description'] ?? "",
+            style: TextStyle(
+              fontSize: 15,
+              color: Colors.grey[700],
+              fontStyle: FontStyle.italic,
+            ),
+          ),
         ),
         const SizedBox(height: 20),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text("Identification Match", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            Text("$accuracyInt%", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF3F7795))),
+            const Text(
+              "Identification Match",
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              "$accuracyInt%",
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF3F7795),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 6),
-        LinearProgressIndicator(value: accuracyDouble, backgroundColor: const Color(0xFFEEEEEE), color: const Color(0xFF3F7795)),
+        LinearProgressIndicator(
+          value: accuracyDouble,
+          backgroundColor: const Color(0xFFEEEEEE),
+          color: const Color(0xFF3F7795),
+        ),
         const SizedBox(height: 25),
-        _buildInfoCard("Common Allergies", Icons.warning_amber_rounded, const Color(0xFFFFF4F2), Colors.redAccent, Text(data['allergies'] ?? "")),
+        _buildInfoCard(
+          "Common Allergies",
+          Icons.warning_amber_rounded,
+          const Color(0xFFFFF4F2),
+          Colors.redAccent,
+          Text(data['allergies'] ?? ""),
+        ),
         const SizedBox(height: 16),
-        _buildInfoCard("Care Tips", Icons.lightbulb_outline_rounded, const Color(0xFFF0F9F1), Colors.green, Text(data['care'] ?? "")),
+        _buildInfoCard(
+          "Care Tips",
+          Icons.lightbulb_outline_rounded,
+          const Color(0xFFF0F9F1),
+          Colors.green,
+          Text(data['care'] ?? ""),
+        ),
         const SizedBox(height: 30),
-        SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3F7795)), child: const Text("Done", style: TextStyle(color: Colors.white)))),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3F7795),
+            ),
+            child: const Text("Done", style: TextStyle(color: Colors.white)),
+          ),
+        ),
       ],
     );
   }
@@ -184,32 +253,67 @@ class _CamScanScreenState extends State<CamScanScreen> {
   Widget _buildErrorView(Map<String, dynamic> data) {
     return Column(
       children: [
-        const Icon(Icons.nearby_error_outlined, color: Colors.orangeAccent, size: 70),
-        const Text("Invalid Selection", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        const Icon(
+          Icons.nearby_error_outlined,
+          color: Colors.orangeAccent,
+          size: 70,
+        ),
+        const Text(
+          "Invalid Selection",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 12),
-        Text(data['care'] ?? "Not a supported pet.", textAlign: TextAlign.center),
+        Text(
+          data['care'] ?? "Not a supported pet.",
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 30),
-        ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("Got it")),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Got it"),
+        ),
       ],
     );
   }
 
-  Widget _buildInfoCard(String title, IconData icon, Color bg, Color ic, Widget child) {
+  Widget _buildInfoCard(
+    String title,
+    IconData icon,
+    Color bg,
+    Color ic,
+    Widget child,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(15)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [Icon(icon, size: 20, color: ic), const SizedBox(width: 8), Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: ic))]),
-        const SizedBox(height: 10),
-        child,
-      ]),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: ic),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(fontWeight: FontWeight.bold, color: ic),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          child,
+        ],
+      ),
     );
   }
 
   // --- ACTIONS ---
 
   Future<void> _takePicture() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    if (_cameraController == null || !_cameraController!.value.isInitialized)
+      return;
     final XFile image = await _cameraController!.takePicture();
     await _processImage(File(image.path));
   }
@@ -226,9 +330,11 @@ class _CamScanScreenState extends State<CamScanScreen> {
       backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Pet Scanner', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        iconTheme: const IconThemeData(
+          color: Colors.white,
+        ), // Ensures back button is white
       ),
       body: Stack(
         children: [
@@ -236,32 +342,66 @@ class _CamScanScreenState extends State<CamScanScreen> {
             child: FutureBuilder(
               future: _initializeControllerFuture,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done && _cameraController != null) {
+                if (snapshot.connectionState == ConnectionState.done &&
+                    _cameraController != null) {
                   return CameraPreview(_cameraController!);
                 }
-                return const Center(child: CircularProgressIndicator(color: Colors.white));
+                return const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                );
               },
             ),
           ),
           Center(
             child: Container(
-              width: 250, height: 250,
-              decoration: BoxDecoration(border: Border.all(color: Colors.white54, width: 2), borderRadius: BorderRadius.circular(30)),
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white54, width: 2),
+                borderRadius: BorderRadius.circular(30),
+              ),
             ),
           ),
           if (_isProcessing)
-            Container(color: Colors.black54, child: const Center(child: CircularProgressIndicator())),
+            Container(
+              color: Colors.black54,
+              child: const Center(child: CircularProgressIndicator()),
+            ),
           Positioned(
-            bottom: 40, left: 0, right: 0,
+            bottom: 40,
+            left: 0,
+            right: 0,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                IconButton(icon: const Icon(Icons.photo_library, color: Colors.white, size: 30), onPressed: _pickImageFromGallery),
+                IconButton(
+                  icon: const Icon(
+                    Icons.photo_library,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                  onPressed: _pickImageFromGallery,
+                ),
                 GestureDetector(
                   onTap: _takePicture,
-                  child: Container(height: 70, width: 70, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 4), color: Colors.white24)),
+                  child: Container(
+                    height: 70,
+                    width: 70,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 4),
+                      color: Colors.white24,
+                    ),
+                  ),
                 ),
-                IconButton(icon: const Icon(Icons.flip_camera_ios, color: Colors.white, size: 30), onPressed: _toggleCamera),
+                IconButton(
+                  icon: const Icon(
+                    Icons.flip_camera_ios,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                  onPressed: _toggleCamera,
+                ),
               ],
             ),
           ),
