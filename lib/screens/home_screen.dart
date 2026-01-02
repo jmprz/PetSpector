@@ -119,366 +119,381 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-void _showHistoryDetail(Map<String, dynamic> data) {
-  // Extract accuracy for the progress bar
-  final int accuracyInt = data['accuracy'] ?? 0;
-  final double accuracyDouble = accuracyInt / 100.0;
+  void _showHistoryDetail(Map<String, dynamic> data) {
+    // Extract accuracy for the progress bar
+    final int accuracyInt = data['accuracy'] ?? 0;
+    final double accuracyDouble = accuracyInt / 100.0;
 
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) => Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
-      child: Column(
-        children: [
-          // Drag handle
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            height: 5,
-            width: 50,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // --- IMAGE SECTION ---
-                  if (data['imageUrl'] != null) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Image.network(
-                        data['imageUrl'],
-                        height: 300,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            Container(
-                              height: 200,
-                              color: Colors.grey[200],
-                              child: const Icon(Icons.broken_image, size: 50),
-                            ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-
-                  // --- BREED & DESCRIPTION ---
-                  Text(
-                    data['result'] ?? 'Unknown Breed',
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (data['description'] != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Text(
-                        data['description'],
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.grey[700],
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                  
-                  const SizedBox(height: 20),
-
-                  // --- ACCURACY SECTION ---
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Identification Match",
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blueGrey[700]),
-                          ),
-                          Text(
-                            "$accuracyInt%",
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF3F7795)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: accuracyDouble,
-                          backgroundColor: const Color(0xFFEEEEEE),
-                          color: const Color(0xFF3F7795),
-                          minHeight: 8,
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 25),
-
-                  // --- INFO CARDS ---
-                  _buildInfoCard(
-                    title: "Common Allergies",
-                    icon: Icons.warning_amber_rounded,
-                    color: const Color(0xFFFFF4F2),
-                    iconColor: Colors.redAccent,
-                    child: Text(
-                      data['allergies'] ?? "No allergy data saved.",
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  _buildInfoCard(
-                    title: "Care Tips",
-                    icon: Icons.lightbulb_outline_rounded,
-                    color: const Color(0xFFF0F9F1),
-                    iconColor: Colors.green,
-                    child: Text(data['care'] ?? "No care tips saved."),
-                  ),
-                  const SizedBox(height: 30),
-
-                  // --- CLOSE BUTTON ---
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF3F7795),
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                      ),
-                      child: const Text(
-                        "Close",
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ],
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        child: Column(
+          children: [
+            // Drag handle
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              height: 5,
+              width: 50,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Widget _buildHomeTab() {
-  return SingleChildScrollView(
-    // PageStorageKey helps the ScrollView remember its position when switching tabs
-    key: const PageStorageKey('home_scroll_view'),
-    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // --- Header Section ---
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: _profileStream(),
-              builder: (context, snapshot) {
-                String displayName = "Pet Lover";
-                if (snapshot.hasData && snapshot.data!.exists) {
-                  final data = snapshot.data!.data();
-                  displayName = data?['firstName'] ?? "Pet Lover";
-                }
-
-                return Column(
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // --- IMAGE SECTION ---
+                    if (data['imageUrl'] != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.network(
+                          data['imageUrl'],
+                          height: 300,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                height: 200,
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.broken_image, size: 50),
+                              ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // --- BREED & DESCRIPTION ---
                     Text(
-                      "Hello, $displayName",
+                      data['result'] ?? 'Unknown Breed',
                       style: const TextStyle(
-                        fontSize: 24,
+                        fontSize: 26,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D3142),
                       ),
                     ),
-                    const Text(
-                      "Ready to check your pet today?",
-                      style: TextStyle(color: Colors.grey),
+                    if (data['description'] != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          data['description'],
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.grey[700],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+
+                    const SizedBox(height: 20),
+
+                    // --- ACCURACY SECTION ---
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Identification Match",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blueGrey[700],
+                              ),
+                            ),
+                            Text(
+                              "$accuracyInt%",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF3F7795),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: LinearProgressIndicator(
+                            value: accuracyDouble,
+                            backgroundColor: const Color(0xFFEEEEEE),
+                            color: const Color(0xFF3F7795),
+                            minHeight: 8,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 25),
+
+                    // --- INFO CARDS ---
+                    _buildInfoCard(
+                      title: "Common Allergies",
+                      icon: Icons.warning_amber_rounded,
+                      color: const Color(0xFFFFF4F2),
+                      iconColor: Colors.redAccent,
+                      child: Text(
+                        data['allergies'] ?? "No allergy data saved.",
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    _buildInfoCard(
+                      title: "Care Tips",
+                      icon: Icons.lightbulb_outline_rounded,
+                      color: const Color(0xFFF0F9F1),
+                      iconColor: Colors.green,
+                      child: Text(data['care'] ?? "No care tips saved."),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // --- CLOSE BUTTON ---
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3F7795),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        child: const Text(
+                          "Close",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
                     ),
                   ],
-                );
-              },
-            ),
-            GestureDetector(
-              onTap: () => setState(() => _selectedIndex = 3),
-              child: const CircleAvatar(
-                radius: 25,
-                backgroundColor: Color(0xFFF0F7F9),
-                child: Icon(Icons.settings, color: Color(0xFF3F7795)),
+                ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
 
-        const SizedBox(height: 30),
+  Widget _buildHomeTab() {
+    return SingleChildScrollView(
+      // PageStorageKey helps the ScrollView remember its position when switching tabs
+      key: const PageStorageKey('home_scroll_view'),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // --- Header Section ---
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: _profileStream(),
+                builder: (context, snapshot) {
+                  String displayName = "Pet Lover";
+                  if (snapshot.hasData && snapshot.data!.exists) {
+                    final data = snapshot.data!.data();
+                    displayName = data?['firstName'] ?? "Pet Lover";
+                  }
 
-        // --- Quick Actions Grid ---
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          crossAxisSpacing: 15,
-          mainAxisSpacing: 15,
-          childAspectRatio: 1.5,
-          children: [
-            _buildActionCard(
-              Icons.camera_alt_rounded,
-              "Breed Detector",
-               const Color(0xFF3F7795),
-              () => setState(() => _selectedIndex = 1),
-            ),
-            _buildActionCard(
-              Icons.video_collection,
-              "Mood Detector",
-              const Color(0xFF3F7795),
-              () => setState(() => _selectedIndex = 1),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 30),
-
-        // --- Recent Scans Header ---
-        const Text(
-          "Recent Scans",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 10),
-
-        // --- Real-time Firestore Scans List ---
-        StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('scans')
-              .where(
-                'userId',
-                isEqualTo: FirebaseAuth.instance.currentUser?.uid,
-              )
-              .orderBy('timestamp', descending: true)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(child: Text("Error: ${snapshot.error}"));
-            }
-
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            final docs = snapshot.data?.docs ?? [];
-
-            if (docs.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Center(child: Text("No scans found in your history.")),
-              );
-            }
-
-            return ListView.separated(
-              key: const PageStorageKey('history_list'),
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: docs.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final data = docs[index].data() as Map<String, dynamic>;
-                final String breed = data['result'] ?? 'Unknown Pet';
-                final Timestamp? ts = data['timestamp'] as Timestamp?;
-                final String? imageUrl = data['imageUrl'];
-                final int accuracy = data['accuracy'] ?? 0;
-                final String dateStr = ts != null
-                    ? "${ts.toDate().day}/${ts.toDate().month}/${ts.toDate().year}"
-                    : "Processing...";
-
-                return Card(
-                  color: Colors.white,
-                  margin: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () => _showHistoryDetail(data),
-                    child: ListTile(
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: imageUrl != null
-                            ? Image.network(
-                                imageUrl,
-                                width: 50,
-                                height: 50,
-                                fit: BoxFit.cover,
-                              )
-                            : Container(
-                                width: 50,
-                                height: 50,
-                                color: const Color(0xFFF0F7F9),
-                                child: const Icon(Icons.pets, color: Color(0xFF3F7795)),
-                              ),
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Hello, $displayName",
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2D3142),
+                        ),
                       ),
-                      title: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              breed,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          if (accuracy > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF3F7795).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(5),
-                              ),
+                      const Text(
+                        "Ready to check your pet today?",
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              GestureDetector(
+                onTap: () => setState(() => _selectedIndex = 3),
+                child: const CircleAvatar(
+                  radius: 25,
+                  backgroundColor: Color(0xFFF0F7F9),
+                  child: Icon(Icons.settings, color: Color(0xFF3F7795)),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 30),
+
+          // --- Quick Actions Grid ---
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            crossAxisSpacing: 15,
+            mainAxisSpacing: 15,
+            childAspectRatio: 1.5,
+            children: [
+              _buildActionCard(
+                Icons.camera_alt_rounded,
+                "Breed Detector",
+                const Color(0xFF3F7795),
+                () => setState(() => _selectedIndex = 1),
+              ),
+              _buildActionCard(
+                Icons.video_collection,
+                "Mood Detector",
+                const Color(0xFF3F7795),
+                () => setState(() => _selectedIndex = 1),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 30),
+
+          // --- Recent Scans Header ---
+          const Text(
+            "Recent Scans",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+
+          // --- Real-time Firestore Scans List ---
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('scans')
+                .where(
+                  'userId',
+                  isEqualTo: FirebaseAuth.instance.currentUser?.uid,
+                )
+                .orderBy('timestamp', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(child: Text("Error: ${snapshot.error}"));
+              }
+
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final docs = snapshot.data?.docs ?? [];
+
+              if (docs.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(child: Text("No scans found in your history.")),
+                );
+              }
+
+              return ListView.separated(
+                key: const PageStorageKey('history_list'),
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: docs.length,
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final data = docs[index].data() as Map<String, dynamic>;
+                  final String breed = data['result'] ?? 'Unknown Pet';
+                  final Timestamp? ts = data['timestamp'] as Timestamp?;
+                  final String? imageUrl = data['imageUrl'];
+                  final int accuracy = data['accuracy'] ?? 0;
+                  final String dateStr = ts != null
+                      ? "${ts.toDate().day}/${ts.toDate().month}/${ts.toDate().year}"
+                      : "Processing...";
+
+                  return Card(
+                    color: Colors.white,
+                    margin: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => _showHistoryDetail(data),
+                      child: ListTile(
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: imageUrl != null
+                              ? Image.network(
+                                  imageUrl,
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                )
+                              : Container(
+                                  width: 50,
+                                  height: 50,
+                                  color: const Color(0xFFF0F7F9),
+                                  child: const Icon(
+                                    Icons.pets,
+                                    color: Color(0xFF3F7795),
+                                  ),
+                                ),
+                        ),
+                        title: Row(
+                          children: [
+                            Expanded(
                               child: Text(
-                                "$accuracy%",
+                                breed,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 10,
-                                  color: Color(0xFF3F7795),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
-                        ],
+                            if (accuracy > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF3F7795,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Text(
+                                  "$accuracy%",
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF3F7795),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        subtitle: Text(dateStr),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                       ),
-                      subtitle: Text(dateStr),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                     ),
-                  ),
-                );
-              },
-            );
-          },
-        ),
-        // Spacer at the bottom to ensure bottom items aren't hidden by the Nav Bar
-        const SizedBox(height: 40),
-      ],
-    ),
-  );
-}
+                  );
+                },
+              );
+            },
+          ),
+          // Spacer at the bottom to ensure bottom items aren't hidden by the Nav Bar
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
 
   Widget _buildActionCard(
     IconData icon,

@@ -28,26 +28,26 @@ class BreedDetector {
     // Updated prompt to include local Philippine breeds and description
     final prompt = TextPart("""
   You are a Professional Pet Classifier specialized in local and international breeds.
-  ALLOWED CATEGORIES: Cat, Dog, Tortoise, Saltwater Fish, Bird.
+      ALLOWED CATEGORIES: Cat, Dog, Tortoise, Saltwater Fish, Bird.
 
-  SPECIAL INSTRUCTIONS:
-  - Identify native Filipino dogs as "Aspin (Asong Pinoy)".
-  - Identify native Filipino cats as "Puspin (Pusang Pinoy)".
-  - Provide a brief, friendly description of the breed.
-  - Estimate your identification accuracy as a percentage (e.g., 95).
+      SPECIAL INSTRUCTIONS:
+      - Identify native Filipino dogs as "Aspin (Asong Pinoy)".
+      - Identify native Filipino cats as "Puspin (Pusang Pinoy)".
+      - MIXED BREEDS: If the pet appears to be a mix, identify it as such (e.g., "50% Japanese Spitz, 50% Aspin" or "Mixed Breed (Golden Retriever Mix)").
+      - Provide a brief, friendly description of the breed or the specific mix characteristics.
+      - Estimate your identification accuracy as a percentage (e.g., 92).
 
-  RETURN JSON FORMAT ONLY:
-  {
-    "status": "success" or "error",
-    "message": "if error, explain why",
-    "breed": "Breed Name",
-    "accuracy": 95, 
-    "description": "Brief description of the breed's characteristics",
-    "type": "Cat/Dog/Tortoise/Saltwater Fish/Bird",
-    "allergies": "List details",
-    "care": "Tip"
-  }
-""");
+      RETURN JSON FORMAT ONLY:
+      {
+        "status": "success",
+        "breed": "Breed Name or Mixed Breed details",
+        "accuracy": 92, 
+        "description": "Brief description of characteristics",
+        "type": "Dog",
+        "allergies": "Common allergies for these breeds",
+        "care": "Specific care tip for this type of pet"
+      }
+    """);
 
     final content = [
       Content.multi([prompt, DataPart('image/jpeg', imageBytes)])
