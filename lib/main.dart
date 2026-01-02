@@ -137,7 +137,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  // Use prefixed FirebaseAuth
   final _auth = fb_auth.FirebaseAuth.instance; 
   
   bool _isLoading = false;
@@ -229,98 +228,96 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                "Welcome Back",
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).primaryColor,
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 30),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 1. Logo and Branding
+                Image.asset('assets/images/ps_icon.png', height: 100),
+                const SizedBox(height: 20),
+                const Text(
+                  "PetSpector",
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF3F7795)),
                 ),
-              ),
-              const SizedBox(height: 30),
+                const Text("Login to your account", style: TextStyle(color: Colors.grey)),
+                const SizedBox(height: 40),
 
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: "Email",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 15),
-
-              TextField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                decoration: InputDecoration(
-                  labelText: "Password",
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                // 2. Styled TextFields
+                TextField(
+                  controller: _emailController,
+                  decoration: InputDecoration(
+                    labelText: "Email",
+                    prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF3F7795)),
+                    filled: true,
+                    fillColor: const Color(0xFFF0F7F9),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      borderSide: BorderSide.none,
                     ),
-                    onPressed: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
-                    },
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _resetPassword,
-                  child: const Text(
-                    "Forgot Password?",
-                    style: TextStyle(color: Colors.blueAccent),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: "Password",
+                    prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF3F7795)),
+                    filled: true,
+                    fillColor: const Color(0xFFF0F7F9),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      borderSide: BorderSide.none,
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
 
-              _isLoading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: _loginWithEmail,
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
-                        backgroundColor: const Color(0xFF3F7795),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                // 3. Forgot Password
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _resetPassword,
+                    child: const Text("Forgot Password?", style: TextStyle(color: Color(0xFF3F7795), fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // 4. Action Buttons
+                _isLoading
+                    ? const CircularProgressIndicator()
+                    : ElevatedButton(
+                        onPressed: _loginWithEmail,
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 55),
+                          backgroundColor: const Color(0xFF3F7795),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         ),
+                        child: const Text("Login", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
-                      child: const Text("Login", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("Don't have an account? "),
+                    GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/signup'),
+                      child: const Text("Sign Up", style: TextStyle(color: Color(0xFF3F7795), fontWeight: FontWeight.bold)),
                     ),
-
-              const SizedBox(height: 15),
-
-              OutlinedButton(
-                onPressed: () {
-                  // Use the named route for sign up
-                  Navigator.pushNamed(context, '/signup');
-                },
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  foregroundColor: const Color(0xFF3F7795),
-                  side: const BorderSide(color: Color(0xFF3F7795)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  ],
                 ),
-                child: const Text("Sign Up", style: TextStyle(fontSize: 16)),
-              ),
-
-              const SizedBox(height: 20),
-            ],
+              ],
+            ),
           ),
         ),
       ),

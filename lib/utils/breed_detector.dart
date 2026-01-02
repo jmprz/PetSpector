@@ -22,49 +22,50 @@ class BreedDetector {
   }
 
   Future<Map<String, dynamic>> predict(File imageFile) async {
-    try {
-      final Uint8List imageBytes = await imageFile.readAsBytes();
+  try {
+    final Uint8List imageBytes = await imageFile.readAsBytes();
 
-      // We update the prompt to ask for JSON specifically
-      final prompt = TextPart("""
-        You are a Strict Pet Classifier. 
-        ALLOWED CATEGORIES: Cat, Dog, Tortoise, Saltwater Fish, Bird.
+    // Updated prompt to include local Philippine breeds and description
+    final prompt = TextPart("""
+  You are a Professional Pet Classifier specialized in local and international breeds.
+  ALLOWED CATEGORIES: Cat, Dog, Tortoise, Saltwater Fish, Bird.
 
-        TASK:
-        1. Identify the breed and info.
-        2. If the image is not an animal or not in the categories, set "status" to "error".
+  SPECIAL INSTRUCTIONS:
+  - Identify native Filipino dogs as "Aspin (Asong Pinoy)".
+  - Identify native Filipino cats as "Puspin (Pusang Pinoy)".
+  - Provide a brief, friendly description of the breed.
+  - Estimate your identification accuracy as a percentage (e.g., 95).
 
-        RETURN JSON FORMAT ONLY:
-        {
-          "status": "success" or "error",
-          "message": "if error, explain why",
-          "breed": "Name",
-          "type": "Cat/Dog/Tortoise/Saltwater Fish/Bird",
-          "allergies": "List details",
-          "care": "Tip"
-        }
-      """);
-
-      final content = [
-        Content.multi([prompt, DataPart('image/jpeg', imageBytes)])
-      ];
-
-      final response = await _model.generateContent(content);
-      final String jsonText = response.text ?? "{}";
-
-      // 1. Convert the String response into a real Map
-      final Map<String, dynamic> data = jsonDecode(jsonText);
-
-      // 2. Handle the logical error we defined in the prompt
-      if (data['status'] == 'error') {
-        return _errorMap(data['message'] ?? "Not a supported pet.");
-      }
-
-      return data;
-    } catch (e) {
-      return _errorMap("Connection failed. Please try again.");
-    }
+  RETURN JSON FORMAT ONLY:
+  {
+    "status": "success" or "error",
+    "message": "if error, explain why",
+    "breed": "Breed Name",
+    "accuracy": 95, 
+    "description": "Brief description of the breed's characteristics",
+    "type": "Cat/Dog/Tortoise/Saltwater Fish/Bird",
+    "allergies": "List details",
+    "care": "Tip"
   }
+""");
+
+    final content = [
+      Content.multi([prompt, DataPart('image/jpeg', imageBytes)])
+    ];
+
+    final response = await _model.generateContent(content);
+    final String jsonText = response.text ?? "{}";
+    final Map<String, dynamic> data = jsonDecode(jsonText);
+
+    if (data['status'] == 'error') {
+      return _errorMap(data['message'] ?? "Not a supported pet.");
+    }
+
+    return data;
+  } catch (e) {
+    return _errorMap("Connection failed. Please try again.");
+  }
+}
 
   // Unified error map to keep your UI from crashing
   Map<String, dynamic> _errorMap(String message) {

@@ -51,8 +51,6 @@ flutter:
     - assets/images/ps_icon.png
     - assets/images/ps_logo.png
     - assets/images/google_logo.png
-    - assets/mobilenet_v2.tflite
-    - assets/labels.txt
     - .env
 
   fonts:
