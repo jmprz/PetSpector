@@ -5,16 +5,23 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class BreedDetector {
-  final String _apiKey = dotenv.env['GEMINI_API_KEY'] ?? "";
   late final GenerativeModel _model;
 
   BreedDetector() {
-    if (_apiKey.isEmpty) {
-      throw Exception("API Key not found in .env file");
+    String apiKey;
+    try {
+      apiKey = dotenv.env['GEMINI_API_KEY'] ?? "";
+    } catch (e) {
+      throw Exception("DotEnv not initialized. Please ensure .env file is loaded: $e");
     }
+    
+    if (apiKey.isEmpty) {
+      throw Exception("API Key not found in .env file. Please set GEMINI_API_KEY");
+    }
+    
     _model = GenerativeModel(
       model: 'gemini-2.5-flash', // Corrected version
-      apiKey: _apiKey,
+      apiKey: apiKey,
       generationConfig: GenerationConfig(
         responseMimeType: 'application/json', // Keep this! It's better for apps
       ),

@@ -14,8 +14,15 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 List<CameraDescription> cameras = [];
 
 Future<void> main() async {
-  await dotenv.load(fileName: ".env"); // Load the file
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load .env file if it exists
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint("Warning: .env file not found. Please create .env file with GEMINI_API_KEY: $e");
+    // Continue execution - breed_detector and mood_detector will handle missing API key
+  }
 
   // Initialize Firebase
   await Firebase.initializeApp(
