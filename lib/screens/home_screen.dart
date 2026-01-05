@@ -8,12 +8,62 @@ import 'package:image_picker/image_picker.dart';
 import 'cam_scan_screen.dart';
 import 'mood_detector_screen.dart';
 import 'notification_settings_screen.dart';
+import 'package:video_player/video_player.dart'; // Add this line
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class FullscreenVideoPlayer extends StatefulWidget {
+  final String url;
+  const FullscreenVideoPlayer({super.key, required this.url});
+
+  @override
+  State<FullscreenVideoPlayer> createState() => _FullscreenVideoPlayerState();
+}
+
+class _FullscreenVideoPlayerState extends State<FullscreenVideoPlayer> {
+  late VideoPlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+      ..initialize().then((_) => setState(() {
+            _controller.play();
+            _controller.setLooping(true);
+          }));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(backgroundColor: Colors.transparent, iconTheme: const IconThemeData(color: Colors.white)),
+      body: Center(
+        child: _controller.value.isInitialized
+            ? AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: VideoPlayer(_controller),
+              )
+            : const CircularProgressIndicator(color: Colors.white),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => setState(() => _controller.value.isPlaying ? _controller.pause() : _controller.play()),
+        child: Icon(_controller.value.isPlaying ? Icons.pause : Icons.play_arrow),
+      ),
+    );
+  }
 }
 
 class _HomeScreenState extends State<HomeScreen> {
@@ -26,6 +76,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   bool _isEditingProfile = false;
+
+  String _currentFilter = 'All'; // Options: 'All', 'Breed', 'Mood'
 
   // --- Logic Methods ---
 
@@ -150,6 +202,32 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return controller.stream;
   }
+
+      void _handleLogout(BuildContext context) async {
+  // Show a confirmation dialog
+  bool? confirm = await showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("Logout"),
+      content: const Text("Are you sure you want to sign out?"),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true), 
+          child: const Text("Logout", style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    ),
+  );
+
+  if (confirm == true) {
+    await FirebaseAuth.instance.signOut();
+    // Navigate to login and remove all previous screens from the stack
+    if (context.mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    }
+  }
+}
 
   void _emitCombined(
     StreamController<List<Map<String, dynamic>>> controller,
@@ -417,51 +495,78 @@ class _HomeScreenState extends State<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // --- MEDIA SECTION ---
-        if (data['mediaUrl'] != null) ...[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Image.network(
-              data['mediaUrl'],
-              height: 300,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) =>
-                  Container(
-                    height: 200,
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.broken_image, size: 50),
-                  ),
-            ),
+ // --- MEDIA SECTION ---
+if (data['mediaUrl'] != null) ...[
+  GestureDetector(
+    onTap: () {
+      if (data['mediaUrl'].contains('.mp4')) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FullscreenVideoPlayer(url: data['mediaUrl']),
           ),
-          const SizedBox(height: 20),
-        ],
+        );
+      }
+    },
+    child: Container(
+      height: 250, // Slightly shorter to save space
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(20),
+        image: !data['mediaUrl'].contains('.mp4') 
+            ? DecorationImage(image: NetworkImage(data['mediaUrl']), fit: BoxFit.cover)
+            : null,
+      ),
+      child: data['mediaUrl'].contains('.mp4')
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.play_circle_outline, color: Colors.white, size: 80),
+                  SizedBox(height: 10),
+                  Text("Tap to Play Video", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            )
+          : null,
+    ),
+  ),
+  const SizedBox(height: 20),
+],
 
-        // --- MOOD BADGE ---
-        Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            decoration: BoxDecoration(
-              color: moodColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: moodColor, width: 2),
+  // --- MOOD BADGE ---
+Center(
+  child: Container(
+    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+    // Added a constraint to ensure the badge doesn't try to be wider than the screen
+    constraints: const BoxConstraints(maxWidth: 300), 
+    decoration: BoxDecoration(
+      color: moodColor.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(30),
+      border: Border.all(color: moodColor, width: 2),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.mood, color: moodColor, size: 32),
+        const SizedBox(width: 12),
+        // Wrap the text in Flexible to prevent the 320px overflow error
+        Flexible(
+          child: Text(
+            data['mood'] ?? 'Unknown Mood',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: moodColor,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.mood, color: moodColor, size: 32),
-                const SizedBox(width: 12),
-                Text(
-                  data['mood'] ?? 'Unknown Mood',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: moodColor,
-                  ),
-                ),
-              ],
-            ),
+            overflow: TextOverflow.ellipsis, // Adds "..." if the text is too long
           ),
         ),
+      ],
+    ),
+  ),
+),
         const SizedBox(height: 20),
 
         // --- CONFIDENCE SECTION ---
@@ -576,255 +681,283 @@ class _HomeScreenState extends State<HomeScreen> {
     return const Color(0xFF3F7795);
   }
 
-  Widget _buildHomeTab() {
-    return SingleChildScrollView(
-      // PageStorageKey helps the ScrollView remember its position when switching tabs
-      key: const PageStorageKey('home_scroll_view'),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+Widget _buildHistoryCard(Map<String, dynamic> data) {
+  final bool isMood = data['_type'] == 'mood';
+  final String title = isMood ? (data['mood'] ?? 'Mood Analysis') : (data['result'] ?? 'Unknown Pet');
+  final int score = isMood ? (data['confidence'] ?? 0) : (data['accuracy'] ?? 0);
+  final Timestamp? ts = data['timestamp'] as Timestamp?;
+  final String dateStr = ts != null ? _formatTimestamp(ts) : "Just now";
+
+  // --- SPECIFIC COLOR CONFIGURATION ---
+  // Primary Blue is used elsewhere, so we use unique colors for the history categories
+  final Color breedColor = Colors.orange.shade800; // Distinct color for Breed Scans
+  final Color moodColor = const Color(0xFF6C63FF); // Distinct color for Mood Analysis
+  
+  final Color themeColor = isMood ? moodColor : breedColor;
+  final IconData themeIcon = isMood ? Icons.videocam_rounded : Icons.pets_rounded;
+
+  return Container(
+    margin: const EdgeInsets.symmetric(vertical: 6),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.03),
+          blurRadius: 15,
+          offset: const Offset(0, 5),
+        )
+      ],
+    ),
+    child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      leading: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: themeColor.withOpacity(0.12), // Soft background of the specific color
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Icon(themeIcon, color: themeColor, size: 26),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold, 
+          fontSize: 16, 
+          color: Color(0xFF2D3142),
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Row(
+          children: [
+            Icon(Icons.calendar_month_outlined, size: 14, color: Colors.grey[500]),
+            const SizedBox(width: 4),
+            Text(dateStr, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+          ],
+        ),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // --- Header Section ---
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: _profileStream(),
-                builder: (context, snapshot) {
-                  String displayName = "Pet Lover";
-                  if (snapshot.hasData && snapshot.data!.exists) {
-                    final data = snapshot.data!.data();
-                    displayName = data?['firstName'] ?? "Pet Lover";
-                  }
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Hello, $displayName",
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2D3142),
-                        ),
-                      ),
-                      const Text(
-                        "Ready to check your pet today?",
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  );
-                },
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: themeColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              "$score%",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: themeColor,
               ),
-              GestureDetector(
-                onTap: () => setState(() => _selectedIndex = 3),
-                child: const CircleAvatar(
-                  radius: 25,
-                  backgroundColor: Color(0xFFF0F7F9),
-                  child: Icon(Icons.settings, color: Color(0xFF3F7795)),
-                ),
-              ),
-            ],
+            ),
           ),
-
-          const SizedBox(height: 30),
-
-          // --- Quick Actions Grid ---
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            crossAxisSpacing: 15,
-            mainAxisSpacing: 15,
-            childAspectRatio: 1.5,
-            children: [
-              _buildActionCard(
-                Icons.camera_alt_rounded,
-                "Breed Detector",
-                const Color(0xFF3F7795),
-                () => setState(() => _selectedIndex = 1),
-              ),
-              _buildActionCard(
-                Icons.video_collection,
-                "Mood Detector",
-                const Color(0xFF3F7795),
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MoodDetectorScreen()),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 30),
-
-          // --- Recent Scans Header ---
-          const Text(
-            "Recent Scans",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-
-          // --- Real-time Combined Scans and Mood Analyses List ---
-          StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _combinedScansStream(),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Center(child: Text("Error: ${snapshot.error}"));
-              }
-
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final items = snapshot.data ?? [];
-
-              if (items.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Center(child: Text("No scans found in your history.")),
-                );
-              }
-
-              return ListView.separated(
-                key: const PageStorageKey('history_list'),
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: items.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final data = items[index];
-                  final bool isMood = data['_type'] == 'mood';
-                  final String title = isMood 
-                      ? (data['mood'] ?? 'Mood Analysis')
-                      : (data['result'] ?? 'Unknown Pet');
-                  final Timestamp? ts = data['timestamp'] as Timestamp?;
-                  final String? mediaUrl = data['imageUrl'] ?? data['mediaUrl'];
-                  final int score = isMood 
-                      ? (data['confidence'] ?? 0)
-                      : (data['accuracy'] ?? 0);
-                  final String dateStr = ts != null
-                      ? "${ts.toDate().day}/${ts.toDate().month}/${ts.toDate().year}"
-                      : "Processing...";
-
-                  return Card(
-                    color: Colors.white,
-                    margin: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      onTap: () => _showHistoryDetail(data),
-                      child: ListTile(
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: mediaUrl != null
-                              ? Image.network(
-                                  mediaUrl,
-                                  width: 50,
-                                  height: 50,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      Container(
-                                        width: 50,
-                                        height: 50,
-                                        color: const Color(0xFFF0F7F9),
-                                        child: Icon(
-                                          isMood ? Icons.mood : Icons.pets,
-                                          color: const Color(0xFF3F7795),
-                                        ),
-                                      ),
-                                )
-                              : Container(
-                                  width: 50,
-                                  height: 50,
-                                  color: const Color(0xFFF0F7F9),
-                                  child: Icon(
-                                    isMood ? Icons.mood : Icons.pets,
-                                    color: const Color(0xFF3F7795),
-                                  ),
-                                ),
-                        ),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            if (score > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xFF3F7795,
-                                  ).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                                child: Text(
-                                  "$score%",
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    color: Color(0xFF3F7795),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        subtitle: Row(
-                          children: [
-                            if (isMood)
-                              Container(
-                                margin: const EdgeInsets.only(right: 8),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.purple.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                                child: const Text(
-                                  "Mood",
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    color: Colors.purple,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            Text(dateStr),
-                          ],
-                        ),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-          // Spacer at the bottom to ensure bottom items aren't hidden by the Nav Bar
-          const SizedBox(height: 40),
+          const SizedBox(width: 4),
+          Icon(Icons.chevron_right_rounded, color: Colors.grey[400]),
         ],
       ),
-    );
-  }
+      onTap: () => _showHistoryDetail(data),
+    ),
+  );
+}
+
+// Simple Date Formatter
+String _formatTimestamp(Timestamp ts) {
+  DateTime dt = ts.toDate();
+  return "${dt.day}/${dt.month}/${dt.year}";
+}
+
+Widget _buildCustomHeader() {
+  return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    stream: _profileStream(),
+    builder: (context, snapshot) {
+      String displayName = "Pet Lover";
+      if (snapshot.hasData && snapshot.data!.exists) {
+        final data = snapshot.data!.data();
+        displayName = data?['firstName'] ?? "Pet Lover";
+      }
+
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Hello, $displayName",
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2D3142),
+                ),
+              ),
+              const Text(
+                "Ready to check your pet today?",
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+          GestureDetector(
+            onTap: () => setState(() => _selectedIndex = 2), // Navigate to Profile
+            child: const CircleAvatar(
+              radius: 25,
+              backgroundColor: Color(0xFFF0F7F9),
+              child: Icon(Icons.person, color: Color(0xFF3F7795)),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+ Widget _buildHomeTab() {
+  return SingleChildScrollView(
+    key: const PageStorageKey('home_scroll_view'),
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // --- Header Section ---
+        _buildCustomHeader(),
+
+        const SizedBox(height: 25),
+
+        // --- Quick Actions Grid ---
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          crossAxisSpacing: 15,
+          mainAxisSpacing: 15,
+          childAspectRatio: 1.4,
+          children: [
+            _buildActionCard(
+              Icons.center_focus_strong,
+              "Breed Detector",
+              "Identify breeds",
+              Colors.orange.shade800,
+              () => setState(() => _selectedIndex = 1),
+            ),
+            _buildActionCard(
+              Icons.insights,
+              "Mood Detector",
+              "Analyze behavior",
+              const Color(0xFF6C63FF), // Distinct color for Mood
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const MoodDetectorScreen()),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 30),
+
+        // --- Recent Scans Header & Filter ---
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              "Recent Activity",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2D3142)),
+            ),
+          ],
+        ),
+        
+        // --- Filter Chips ---
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: ['All', 'Breed', 'Mood'].map((filter) {
+              bool isSelected = _currentFilter == filter;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: FilterChip(
+                  label: Text(filter),
+                  selected: isSelected,
+                  onSelected: (bool value) {
+                    setState(() => _currentFilter = filter);
+                  },
+                  selectedColor: const Color(0xFF3F7795).withOpacity(0.2),
+                  checkmarkColor: const Color(0xFF3F7795),
+                  labelStyle: TextStyle(
+                    color: isSelected ? const Color(0xFF3F7795) : Colors.grey,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+
+        const SizedBox(height: 15),
+
+        // --- Real-time Combined List ---
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _combinedScansStream(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}"));
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            // FILTER LOGIC
+            final allItems = snapshot.data ?? [];
+            final items = allItems.where((item) {
+              if (_currentFilter == 'All') return true;
+              if (_currentFilter == 'Mood') return item['_type'] == 'mood';
+              if (_currentFilter == 'Breed') return item['_type'] != 'mood';
+              return true;
+            }).toList();
+
+            if (items.isEmpty) {
+              return _buildEmptyState();
+            }
+
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: items.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) => _buildHistoryCard(items[index]),
+            );
+          },
+        ),
+        const SizedBox(height: 40),
+      ],
+    ),
+  );
+}
+
+Widget _buildEmptyState() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 40),
+    child: Center(
+      child: Column(
+        children: [
+          Icon(Icons.history_rounded, size: 50, color: Colors.grey[300]),
+          const SizedBox(height: 10),
+          Text(
+            "No ${_currentFilter == 'All' ? 'activity' : _currentFilter.toLowerCase() + 's'} found",
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildActionCard(
     IconData icon,
     String label,
+    String subtitle, 
     Color color,
     VoidCallback onTap,
   ) {
@@ -1010,81 +1143,101 @@ class _HomeScreenState extends State<HomeScreen> {
     final photoUrl = data['photoUrl'];
 
     // Load data into controllers when editing
-    if (_isEditingProfile && _firstNameController.text.isEmpty) {
-      _firstNameController.text = firstName;
-      _lastNameController.text = lastName;
-      _usernameController.text = username;
-    }
+   if (_isEditingProfile && _firstNameController.text.isEmpty) {
+    _firstNameController.text = firstName;
+    _lastNameController.text = lastName;
+    _usernameController.text = username;
+  }
 
-    if (_isEditingProfile) {
-      return _buildProfileForm();
-    }
+  if (_isEditingProfile) {
+    return _buildProfileForm();
+  }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 70,
-                backgroundColor: const Color(0xFFF0F7F9),
-                backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                    ? NetworkImage(photoUrl)
-                    : null,
-                child: photoUrl == null || photoUrl.isEmpty
-                    ? const Icon(Icons.person, size: 70, color: Color(0xFF3F7795))
-                    : null,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
+  return SingleChildScrollView(
+    padding: const EdgeInsets.all(20),
+    child: Column(
+      children: [
+        const SizedBox(height: 20),
+        CircleAvatar(
+          radius: 70,
+          backgroundColor: const Color(0xFFF0F7F9),
+          backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+              ? NetworkImage(photoUrl)
+              : null,
+          child: photoUrl == null || photoUrl.isEmpty
+              ? const Icon(Icons.person, size: 70, color: Color(0xFF3F7795))
+              : null,
+        ),
+        const SizedBox(height: 20),
+        Text(
+          '$firstName $lastName'.trim().isEmpty ? 'No Name' : '$firstName $lastName'.trim(),
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        if (username.isNotEmpty) ...[
+          const SizedBox(height: 8),
           Text(
-            '$firstName $lastName'.trim().isEmpty ? 'No Name' : '$firstName $lastName'.trim(),
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          if (username.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              '@$username',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-            ),
-          ],
-          const SizedBox(height: 30),
-          _buildProfileInfoCard(Icons.email, "Email", email),
-          const SizedBox(height: 15),
-          _buildProfileInfoCard(Icons.calendar_today, "Member Since", 
-              data['createdAt'] != null 
-                  ? "${(data['createdAt'] as Timestamp).toDate().day}/${(data['createdAt'] as Timestamp).toDate().month}/${(data['createdAt'] as Timestamp).toDate().year}"
-                  : "N/A"),
-          const SizedBox(height: 30),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _isEditingProfile = true;
-                  _imageFile = null; // Reset image file
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3F7795),
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-              ),
-              child: const Text(
-                "Edit Profile",
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
+            '@$username',
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
           ),
         ],
-      ),
-    );
-  }
+        const SizedBox(height: 30),
+        _buildProfileInfoCard(Icons.email, "Email", email),
+        const SizedBox(height: 15),
+        _buildProfileInfoCard(
+          Icons.calendar_today, 
+          "Member Since", 
+          data['createdAt'] != null 
+              ? "${(data['createdAt'] as Timestamp).toDate().day}/${(data['createdAt'] as Timestamp).toDate().month}/${(data['createdAt'] as Timestamp).toDate().year}"
+              : "N/A"
+        ),
+        
+        const SizedBox(height: 30),
+
+        // --- BUTTONS SECTION ---
+        Column(
+          children: [
+            // Edit Profile Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => setState(() => _isEditingProfile = true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF3F7795),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                child: const Text(
+                  "Edit Profile",
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 12), // Space between buttons
+
+            // Logout Button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _handleLogout(context),
+                icon: const Icon(Icons.logout, color: Colors.redAccent),
+                label: const Text(
+                  "Logout",
+                  style: TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  side: const BorderSide(color: Colors.redAccent),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildProfileInfoCard(IconData icon, String label, String value) {
     return Container(

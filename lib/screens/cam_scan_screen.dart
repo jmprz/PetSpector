@@ -326,16 +326,23 @@ class _CamScanScreenState extends State<CamScanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(
-          color: Colors.white,
-        ), // Ensures back button is white
+   return Scaffold(
+  backgroundColor: Colors.black,
+  extendBodyBehindAppBar: true,
+  appBar: AppBar(
+    backgroundColor: Colors.transparent,
+    elevation: 0,
+    centerTitle: true,
+    iconTheme: const IconThemeData(color: Colors.white),
+    // Wrap the Text in Padding to add space at the top
+    title: Padding(
+      padding: const EdgeInsets.only(top: 10.0), // Adjust this value as needed
+      child: const Text(
+        "Breed Detector",
+        style: TextStyle(color: Colors.white),
       ),
+    ),
+  ),
       body: Stack(
         children: [
           Positioned.fill(

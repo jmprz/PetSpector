@@ -144,44 +144,50 @@ class _MoodDetectorScreenState extends State<MoodDetectorScreen> {
     }
   }
 
-  Future<void> _saveMoodAnalysisToHistory(
-    Map<String, dynamic> result,
-    File mediaFile, {
-    bool isImage = false,
-  }) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+Future<void> _saveMoodAnalysisToHistory(
+  Map<String, dynamic> result,
+  File mediaFile, {
+  bool isImage = false,
+}) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
 
-    try {
-      String fileName = isImage
-          ? 'mood_analysis/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg'
-          : 'mood_analysis/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.mp4';
+  try {
+    // 1. Upload the file to Firebase Storage
+    String folder = isImage ? 'mood_images' : 'mood_videos';
+    String extension = isImage ? 'jpg' : 'mp4';
+    String fileName = '$folder/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.$extension';
 
-      UploadTask uploadTask = FirebaseStorage.instance
-          .ref()
-          .child(fileName)
-          .putFile(mediaFile);
-      TaskSnapshot snapshot = await uploadTask;
-      String mediaUrl = await snapshot.ref.getDownloadURL();
+    UploadTask uploadTask = FirebaseStorage.instance
+        .ref()
+        .child(fileName)
+        .putFile(mediaFile);
+        
+    TaskSnapshot snapshot = await uploadTask;
+    String mediaUrl = await snapshot.ref.getDownloadURL();
 
-      await FirebaseFirestore.instance.collection('mood_analysis').add({
-        'userId': user.uid,
-        'mood': result['mood'],
-        'confidence': result['confidence'],
-        'bodyLanguage': result['bodyLanguage'],
-        'behaviorAnalysis': result['behaviorAnalysis'],
-        'concerns': result['concerns'],
-        'positiveSigns': result['positiveSigns'],
-        'type': result['type'],
-        'recommendations': result['recommendations'],
-        'mediaUrl': mediaUrl,
-        'isVideo': !isImage,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      debugPrint("❌ Failed to save mood analysis: $e");
-    }
+    // 2. Save the metadata to Firestore
+    await FirebaseFirestore.instance.collection('mood_analysis').add({
+      'userId': user.uid,
+      'mood': result['mood'] ?? 'Unknown',
+      'confidence': result['confidence'] ?? 0,
+      'bodyLanguage': result['bodyLanguage'] ?? 'No data',
+      'behaviorAnalysis': result['behaviorAnalysis'] ?? 'No data',
+      'concerns': result['concerns'] ?? 'No concerns observed',
+      'positiveSigns': result['positiveSigns'] ?? 'None detected',
+      'type': result['type'] ?? 'Unknown',
+      'recommendations': result['recommendations'] ?? 'No recommendations',
+      'mediaUrl': mediaUrl, // This link lets you view the video/image later
+      'isVideo': !isImage,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+    
+    debugPrint("✅ Mood analysis saved successfully!");
+  } catch (e) {
+    debugPrint("❌ Failed to save mood analysis: $e");
+    // Optionally show a small toast or snackbar to the user
   }
+}
 
   Future<void> _pickVideoFromGallery() async {
     final picker = ImagePicker();
@@ -248,31 +254,35 @@ class _MoodDetectorScreenState extends State<MoodDetectorScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Mood Badge
-        Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            decoration: BoxDecoration(
-              color: moodColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: moodColor, width: 2),
+       Center(
+  child: Container(
+    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+    decoration: BoxDecoration(
+      color: moodColor.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(30),
+      border: Border.all(color: moodColor, width: 2),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.mood, color: moodColor, size: 32),
+        const SizedBox(width: 12),
+        // Wrap the Text in Flexible to prevent the overflow
+        Flexible( 
+          child: Text(
+            data['mood'] ?? 'Unknown Mood',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: moodColor,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.mood, color: moodColor, size: 32),
-                const SizedBox(width: 12),
-                Text(
-                  data['mood'] ?? 'Unknown Mood',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: moodColor,
-                  ),
-                ),
-              ],
-            ),
+            overflow: TextOverflow.ellipsis, // Adds "..." if still too long
           ),
         ),
+      ],
+    ),
+  ),
+),
         const SizedBox(height: 20),
 
         // Confidence
