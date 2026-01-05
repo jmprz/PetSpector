@@ -47,5 +47,11 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>NSCameraUsageDescription</key>
+		<string>We need camera access to detect pet breeds and moods.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>We need microphone access for video recordings.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>We need library access to save and pick pet media.</string>
 	</dict>
 </plist>

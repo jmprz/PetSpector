@@ -32,26 +32,34 @@ class _MoodDetectorScreenState extends State<MoodDetectorScreen> {
     _initializeCamera(_selectedCameraIndex);
   }
 
-  @override
-  void dispose() {
-    _cameraController?.dispose();
-    super.dispose();
+ @override
+void dispose() {
+  _cameraController?.dispose();
+  super.dispose();
+}
+
+void _initializeCamera(int index) async {
+  if (cameras.isEmpty) return;
+  
+  // Dispose existing controller before starting a new one
+  if (_cameraController != null) {
+    await _cameraController!.dispose();
   }
 
-  void _initializeCamera(int index) {
-    if (cameras.isEmpty) return;
+  _cameraController = CameraController(
+    cameras[index],
+    ResolutionPreset.high,
+    enableAudio: true, // Try setting this to true; some devices crash if false but trying to record video
+  );
 
-    _cameraController = CameraController(
-      cameras[index],
-      ResolutionPreset.high,
-      enableAudio: false,
-    );
-
-    _initializeControllerFuture = _cameraController!.initialize().then((_) {
-      if (!mounted) return;
-      setState(() {});
-    });
+  try {
+    _initializeControllerFuture = _cameraController!.initialize();
+    await _initializeControllerFuture;
+    if (mounted) setState(() {});
+  } catch (e) {
+    debugPrint("Camera Init Error: $e");
   }
+}
 
   void _toggleCamera() {
     if (cameras.length < 2) return;
@@ -59,19 +67,27 @@ class _MoodDetectorScreenState extends State<MoodDetectorScreen> {
     _initializeCamera(_selectedCameraIndex);
   }
 
-  Future<void> _startRecording() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return;
-    }
-
-    try {
-      await _cameraController!.startVideoRecording();
-      setState(() => _isRecording = true);
-    } catch (e) {
-      debugPrint("Error starting video recording: $e");
-    }
+ Future<void> _startRecording() async {
+  if (_cameraController == null || !_cameraController!.value.isInitialized) {
+    debugPrint("Camera not initialized");
+    return;
   }
 
+  if (_cameraController!.value.isRecordingVideo) return;
+
+  try {
+    // Some devices need a tiny delay before starting
+    await Future.delayed(const Duration(milliseconds: 100));
+    await _cameraController!.startVideoRecording();
+    setState(() => _isRecording = true);
+  } catch (e) {
+    debugPrint("Error starting video recording: $e");
+    // Show snackbar so you know if it's a permission issue
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Recording Error: $e")),
+    );
+  }
+}
   Future<void> _stopRecording() async {
     if (_cameraController == null || !_cameraController!.value.isRecordingVideo) {
       return;
