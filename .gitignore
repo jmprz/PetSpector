@@ -45,3 +45,4 @@ app.*.map.json
 /android/app/release
 
 .env
+android/.kotlin/sessions/kotlin-compiler-14749478946278589319.salive
