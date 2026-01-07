@@ -9,6 +9,7 @@ import 'cam_scan_screen.dart';
 import 'mood_detector_screen.dart';
 import 'notification_settings_screen.dart';
 import 'package:video_player/video_player.dart'; // Add this line
+import 'package:fl_chart/fl_chart.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -351,6 +352,82 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+Widget _buildConfidenceGraph(int percentage, Color color) {
+  return SizedBox(
+    height: 150,
+    child: Stack(
+      children: [
+        PieChart(
+          PieChartData(
+            startDegreeOffset: 270,
+            sectionsSpace: 0,
+            centerSpaceRadius: 50,
+            sections: [
+              PieChartSectionData(
+                color: color,
+                value: percentage.toDouble(),
+                showTitle: false,
+                radius: 12,
+              ),
+              PieChartSectionData(
+                color: color.withOpacity(0.1),
+                value: (100 - percentage).toDouble(),
+                showTitle: false,
+                radius: 12,
+              ),
+            ],
+          ),
+        ),
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "$percentage%",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              const Text(
+                "Match",
+                style: TextStyle(fontSize: 10, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildBreedBarChart(List<Map<String, dynamic>> matches) {
+  return Column(
+    children: matches.map((m) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(m['breed'], style: const TextStyle(fontSize: 12)),
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(5),
+              child: LinearProgressIndicator(
+                value: m['confidence'] / 100,
+                minHeight: 10,
+                color: const Color(0xFF3F7795),
+                backgroundColor: Colors.grey[200],
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList(),
+  );
+}
+
   Widget _buildScanDetailContent(Map<String, dynamic> data) {
     final int accuracyInt = data['accuracy'] ?? 0;
     final double accuracyDouble = accuracyInt / 100.0;
@@ -405,37 +482,13 @@ class _HomeScreenState extends State<HomeScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Identification Match",
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blueGrey[700],
-                  ),
-                ),
-                Text(
-                  "$accuracyInt%",
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF3F7795),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(
-                value: accuracyDouble,
-                backgroundColor: const Color(0xFFEEEEEE),
-                color: const Color(0xFF3F7795),
-                minHeight: 8,
-              ),
-            ),
+const SizedBox(height: 10),
+Center(
+  child: _buildConfidenceGraph(
+    accuracyInt, 
+    const Color(0xFF3F7795),
+  ),
+),
           ],
         ),
 
