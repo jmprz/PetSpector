@@ -80,12 +80,15 @@ class _CamScanScreenState extends State<CamScanScreen> {
     }
   }
 
-  Future<void> _saveScanToHistory(
-    Map<String, dynamic> result,
-    File imageFile,
-  ) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+Future<void> _saveScanToHistory(Map<String, dynamic> result, File imageFile) async {
+  // Check if Firebase is even available
+  if (Platform.isLinux || !isFirebaseSupported) {
+    debugPrint("⚠️ Skipping Firebase Save: Platform not supported.");
+    return;
+  }
+
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
 
     try {
       String fileName =

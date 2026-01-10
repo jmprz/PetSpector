@@ -161,19 +161,36 @@ void _initializeCamera(int index) async {
   }
 
 Future<void> _saveMoodAnalysisToHistory(
-  Map<String, dynamic> result,
+  Map<String, dynamic> result, 
   File mediaFile, {
   bool isImage = false,
 }) async {
+  // 1. Guard for Linux/Missing Firebase
+  // This prevents the function from running on your VM where Firebase isn't set up.
+  if (Platform.isLinux || !isFirebaseSupported) {
+    debugPrint("ℹ️ Linux Mode: Mood analysis was not saved to cloud.");
+    return;
+  }
+
+  // 2. Get the current user
   final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return;
+
+  // 3. Safety Check: If no user is logged in, stop here
+  if (user == null) {
+    debugPrint("❌ No user logged in. Cannot save history.");
+    return;
+  }
 
   try {
-    // 1. Upload the file to Firebase Storage
+    // 4. Setup File details for Storage
     String folder = isImage ? 'mood_images' : 'mood_videos';
     String extension = isImage ? 'jpg' : 'mp4';
+    
+    // We use user.uid to organize files by user in the cloud
     String fileName = '$folder/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.$extension';
 
+    // 5. Upload the file to Firebase Storage
+    // 
     UploadTask uploadTask = FirebaseStorage.instance
         .ref()
         .child(fileName)
@@ -182,7 +199,8 @@ Future<void> _saveMoodAnalysisToHistory(
     TaskSnapshot snapshot = await uploadTask;
     String mediaUrl = await snapshot.ref.getDownloadURL();
 
-    // 2. Save the metadata to Firestore
+    // 6. Save the metadata to Firestore
+    // This creates a document that "points" to the file we just uploaded
     await FirebaseFirestore.instance.collection('mood_analysis').add({
       'userId': user.uid,
       'mood': result['mood'] ?? 'Unknown',
@@ -193,15 +211,15 @@ Future<void> _saveMoodAnalysisToHistory(
       'positiveSigns': result['positiveSigns'] ?? 'None detected',
       'type': result['type'] ?? 'Unknown',
       'recommendations': result['recommendations'] ?? 'No recommendations',
-      'mediaUrl': mediaUrl, // This link lets you view the video/image later
+      'mediaUrl': mediaUrl, 
       'isVideo': !isImage,
-      'timestamp': FieldValue.serverTimestamp(),
+      'timestamp': FieldValue.serverTimestamp(), // Uses the official server time
     });
     
     debugPrint("✅ Mood analysis saved successfully!");
   } catch (e) {
+    // If the internet cuts out or permissions fail, this catches the error
     debugPrint("❌ Failed to save mood analysis: $e");
-    // Optionally show a small toast or snackbar to the user
   }
 }
 
