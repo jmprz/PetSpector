@@ -56,40 +56,38 @@ class PetSpectorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'PetSpector',
-      theme: ThemeData(
-        primaryColor: const Color(0xFF3F7795), // theme color
-        fontFamily: 'Poppins', // font for the app
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF3F7795),
-        ).copyWith(
-          // Ensure primary color is used across the app
-          primary: const Color(0xFF3F7795),
-        ),
-      ),
-      debugShowCheckedModeBanner: false,
-      // Use the prefixed User object (fb_auth.User) to check authentication state
-      home: StreamBuilder<fb_auth.User?>( 
+    Widget initialScreen;
+
+    // Guard for Linux / Unsupported Firebase
+    if (Platform.isLinux || !isFirebaseSupported) {
+      debugPrint("Mode: Linux/No-Firebase. Redirecting to Login.");
+      initialScreen = const LoginScreen(); 
+   } else {
+      // Add 'fb_auth.' before User and FirebaseAuth
+      initialScreen = StreamBuilder<fb_auth.User?>( 
         stream: fb_auth.FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
-          // Show splash screen while checking auth state
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const SplashScreen();
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
           }
-          // If user is logged in, go to home screen, otherwise go to login
-          if (snapshot.hasData && snapshot.data != null) {
+          if (snapshot.hasData) {
             return const HomeScreen();
           }
           return const LoginScreen();
         },
+      );
+    }
+    
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'PetSpector',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true, // Optional: makes the UI look more modern
       ),
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/home': (context) => const HomeScreen(),
-        '/signup': (context) => SignUpPage(),
-        '/scan': (context) => const CamScanScreen(), // NEW ROUTE
-      },
+      home: initialScreen,
     );
   }
 }
