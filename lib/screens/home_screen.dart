@@ -68,11 +68,9 @@ class _FullscreenVideoPlayerState extends State<FullscreenVideoPlayer> {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool isFirebaseSupported = false;
   int _selectedIndex = 0; // 0: Home, 1: Scan, 2: Profile, 3: Settings
-  // Fix: Use 'late' or make them nullable to prevent instant initialization crash
-  late final FirebaseAuth? _auth;
-  late final FirebaseFirestore? _firestore;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   File? _imageFile;
   bool _isLoading = false;
   final TextEditingController _firstNameController = TextEditingController();
@@ -83,18 +81,6 @@ class _HomeScreenState extends State<HomeScreen> {
   String _currentFilter = 'All'; // Options: 'All', 'Breed', 'Mood'
 
   // --- Logic Methods ---
-  @override
-  void initState() {
-    super.initState();
-    // Only assign instances if supported
-    if (!Platform.isLinux && isFirebaseSupported) {
-      _auth = FirebaseAuth.instance;
-      _firestore = FirebaseFirestore.instance;
-    } else {
-      _auth = null;
-      _firestore = null;
-    }
-  }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
@@ -104,12 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
- Future<void> _saveProfile() async {
-    // 1. Guard for Linux/Null instances
-    if (_auth == null || _firestore == null) {
-      debugPrint("Firebase not supported on this platform.");
-      return;
-    }
+  Future<void> _saveProfile() async {
     final user = _auth.currentUser;
     if (user == null) return;
     final firstName = _firstNameController.text.trim();
@@ -137,8 +118,8 @@ class _HomeScreenState extends State<HomeScreen> {
     
     setState(() => _isLoading = true);
     try {
-     String? imageUrl;
-      if (_imageFile != null && !Platform.isLinux) {
+      String? imageUrl;
+      if (_imageFile != null) {
         final storageRef = FirebaseStorage.instance.ref().child(
           'profiles/${user.uid}/profile.jpg',
         );
@@ -179,8 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-Stream<DocumentSnapshot<Map<String, dynamic>>> _profileStream() {
-    if (_auth == null || _firestore == null) return const Stream.empty();
+  Stream<DocumentSnapshot<Map<String, dynamic>>> _profileStream() {
     final user = _auth.currentUser;
     return user == null
         ? const Stream.empty()
@@ -189,7 +169,6 @@ Stream<DocumentSnapshot<Map<String, dynamic>>> _profileStream() {
 
   // Combined stream for scans and mood analyses
   Stream<List<Map<String, dynamic>>> _combinedScansStream() {
-    if (_auth == null || _firestore == null) return Stream.value([]);
     final user = _auth.currentUser;
     if (user == null) return Stream.value([]);
 
@@ -1411,11 +1390,10 @@ Widget _buildEmptyState() {
                 subtitle: "Sign out of your account",
                 color: Colors.redAccent,
                 onTap: () async {
-                  await _auth?.signOut();
-                if (mounted) {
-    // If on Linux, just go back to the first screen (Login/Welcome)
-    Navigator.of(context).popUntil((route) => route.isFirst);
-  }
+                  await _auth.signOut();
+                  if (mounted) {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  }
                 },
               ),
             ],

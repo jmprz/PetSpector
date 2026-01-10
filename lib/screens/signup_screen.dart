@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
-import 'dart:io';
 
 class SignUpPage extends StatefulWidget {
   @override
@@ -10,9 +9,9 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
- late final FirebaseAuth _auth;
-  late final FirebaseFirestore _firestore;
-  bool isFirebaseSupported = false; 
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance; // Firestore Instance
+
   // Controllers
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -23,38 +22,23 @@ class _SignUpPageState extends State<SignUpPage> {
 
   bool isLoading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    // Only initialize if supported, otherwise use dummy logic
-    if (!Platform.isLinux && isFirebaseSupported) {
-      _auth = FirebaseAuth.instance;
-      _firestore = FirebaseFirestore.instance;
-    }
-  }
-
- Future<void> signUp() async {
-    // 1. Linux Simulation Check (Keep this at the very top)
-    if (Platform.isLinux || !isFirebaseSupported) {
-      debugPrint("🚀 Linux Mode: Simulating successful signup...");
-      setState(() => isLoading = true);
-      await Future.delayed(const Duration(seconds: 1)); 
-      if (!mounted) return;
-      _showVerificationDialog(); // Test your dialog on Linux!
-      setState(() => isLoading = false);
-      return;
-    }
-
-    // 2. Data Preparation
+  Future<void> signUp() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+    final username = _usernameController.text.trim();
 
-    // 3. Validation
-    if (email.isEmpty || password.isEmpty || _usernameController.text.isEmpty) {
+    // 1. Basic Validation
+    if (email.isEmpty ||
+        password.isEmpty ||
+        firstName.isEmpty ||
+        username.isEmpty) {
       _showSnackBar("Please fill in all fields", Colors.red);
       return;
     }
+
     if (password != confirmPassword) {
       _showSnackBar("Passwords do not match", Colors.red);
       return;
@@ -63,37 +47,39 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => isLoading = true);
 
     try {
-      // 4. Create Auth Account
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email, 
-        password: password
-      );
+      // 1. Create the Auth Account
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
 
-      // 5. Save to Firestore 
-      // TIP: Do this BEFORE signing out, while the user still has permission to write!
-      await _firestore.collection('users').doc(userCredential.user!.uid).set({
-        'firstName': _firstNameController.text.trim(),
-        'lastName': _lastNameController.text.trim(),
-        'username': _usernameController.text.trim(),
-        'email': email,
-        'createdAt': FieldValue.serverTimestamp(), // Better than DateTime.now()
-      });
+      // 2. Try to save to Firestore
+      try {
+        await _firestore.collection('users').doc(userCredential.user!.uid).set({
+          'firstName': _firstNameController.text.trim(),
+          'lastName': _lastNameController.text.trim(),
+          'username': _usernameController.text.trim(),
+          'email': email,
+          'createdAt': DateTime.now(),
+        });
+      } catch (e) {
+        debugPrint("Firestore Error: $e");
+        // Even if Firestore fails, we might want to tell the user
+        // or at least stop the loading state
+      }
 
-      // 6. Send Verification Email
       await userCredential.user?.sendEmailVerification();
 
-      // 7. Sign Out
-      // IMPORTANT: If you have an Auth Listener in main.dart, 
-      // this might trigger a navigation change.
+      // Log the user out immediately so they have to log in AFTER verifying
       await _auth.signOut();
 
-      if (!mounted) return;
-      _showVerificationDialog();
+      setState(() => isLoading = false);
 
+      if (!mounted) return;
+
+      // Show the pop-up instead of navigating to home
+      _showVerificationDialog();
     } on FirebaseAuthException catch (e) {
       _showSnackBar(e.message ?? 'Signup failed', Colors.red);
     } catch (e) {
-      debugPrint("Unexpected Error: $e");
       _showSnackBar("An unexpected error occurred", Colors.red);
     } finally {
       if (mounted) setState(() => isLoading = false);

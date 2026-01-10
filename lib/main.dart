@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'screens/signup_screen.dart';
@@ -13,38 +12,30 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // Global variable to store the list of available cameras
 List<CameraDescription> cameras = [];
-bool isFirebaseSupported = false;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 1. Load .env
+  // Load .env file if it exists
   try {
     await dotenv.load(fileName: ".env");
   } catch (e) {
-    debugPrint("Warning: .env file not found: $e");
+    debugPrint("Warning: .env file not found. Please create .env file with GEMINI_API_KEY: $e");
+    // Continue execution - breed_detector and mood_detector will handle missing API key
   }
 
- // Update the check
-  if (!Platform.isLinux) {
-    try {
-      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-      isFirebaseSupported = true; // Mark as true ONLY if successful
-    } catch (e) {
-      print("Firebase failed: $e");
-    }
-  }
+  // Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-  // 3. Camera Initialization (The Crash Fix)
-  if (!Platform.isLinux) {
-    try {
-      cameras = await availableCameras();
-    } catch (e) {
-      // Catching ALL errors (Exception or Error) ensures the app keeps running
-      debugPrint('Camera system could not be initialized: $e');
-      cameras = []; 
-    }
-  } else {
-    debugPrint("Skipping camera check for Linux - Plugin not supported.");
+  
+  // Initialize cameras (needed for CamScanScreen)
+  try {
+    cameras = await availableCameras();
+  } on CameraException catch (e) {
+    debugPrint('Error getting available cameras: $e');
+    // Initialize to empty list on error to prevent runtime crash
     cameras = [];
   }
 
@@ -56,38 +47,40 @@ class PetSpectorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget initialScreen;
-
-    // Guard for Linux / Unsupported Firebase
-    if (Platform.isLinux || !isFirebaseSupported) {
-      debugPrint("Mode: Linux/No-Firebase. Redirecting to Login.");
-      initialScreen = const LoginScreen(); 
-   } else {
-      // Add 'fb_auth.' before User and FirebaseAuth
-      initialScreen = StreamBuilder<fb_auth.User?>( 
+    return MaterialApp(
+      title: 'PetSpector',
+      theme: ThemeData(
+        primaryColor: const Color(0xFF3F7795), // theme color
+        fontFamily: 'Poppins', // font for the app
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF3F7795),
+        ).copyWith(
+          // Ensure primary color is used across the app
+          primary: const Color(0xFF3F7795),
+        ),
+      ),
+      debugShowCheckedModeBanner: false,
+      // Use the prefixed User object (fb_auth.User) to check authentication state
+      home: StreamBuilder<fb_auth.User?>( 
         stream: fb_auth.FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
+          // Show splash screen while checking auth state
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
+            return const SplashScreen();
           }
-          if (snapshot.hasData) {
+          // If user is logged in, go to home screen, otherwise go to login
+          if (snapshot.hasData && snapshot.data != null) {
             return const HomeScreen();
           }
           return const LoginScreen();
         },
-      );
-    }
-    
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'PetSpector',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true, // Optional: makes the UI look more modern
       ),
-      home: initialScreen,
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/home': (context) => const HomeScreen(),
+        '/signup': (context) => SignUpPage(),
+        '/scan': (context) => const CamScanScreen(), // NEW ROUTE
+      },
     );
   }
 }
