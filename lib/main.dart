@@ -17,30 +17,35 @@ List<CameraDescription> cameras = [];
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Load .env file if it exists
+  // 1. Load .env
   try {
     await dotenv.load(fileName: ".env");
   } catch (e) {
-    debugPrint("Warning: .env file not found. Please create .env file with GEMINI_API_KEY: $e");
-    // Continue execution - breed_detector and mood_detector will handle missing API key
+    debugPrint("Warning: .env file not found: $e");
   }
 
-// ONLY initialize Firebase if NOT on Linux
+  // 2. Firebase Check
   if (!Platform.isLinux) {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } else {
-    print("Skipping Firebase initialization for Linux testing.");
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } catch (e) {
+      debugPrint("Firebase init failed: $e");
+    }
   }
 
-  
-  // Initialize cameras (needed for CamScanScreen)
-  try {
-    cameras = await availableCameras();
-  } on CameraException catch (e) {
-    debugPrint('Error getting available cameras: $e');
-    // Initialize to empty list on error to prevent runtime crash
+  // 3. Camera Initialization (The Crash Fix)
+  if (!Platform.isLinux) {
+    try {
+      cameras = await availableCameras();
+    } catch (e) {
+      // Catching ALL errors (Exception or Error) ensures the app keeps running
+      debugPrint('Camera system could not be initialized: $e');
+      cameras = []; 
+    }
+  } else {
+    debugPrint("Skipping camera check for Linux - Plugin not supported.");
     cameras = [];
   }
 
