@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "96102123175",
+    "firebase_url": "https://petspector-d3e39-default-rtdb.firebaseio.com",
     "project_id": "petspector-d3e39",
     "storage_bucket": "petspector-d3e39.firebasestorage.app"
   },

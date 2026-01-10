@@ -46,6 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '96102123175',
     projectId: 'petspector-d3e39',
     authDomain: 'petspector-d3e39.firebaseapp.com',
+    databaseURL: 'https://petspector-d3e39-default-rtdb.firebaseio.com',
     storageBucket: 'petspector-d3e39.firebasestorage.app',
     measurementId: 'G-WHDXEHJ30P',
   );
@@ -55,6 +56,7 @@ class DefaultFirebaseOptions {
     appId: '1:96102123175:android:c047d340afff6e4d94fd82',
     messagingSenderId: '96102123175',
     projectId: 'petspector-d3e39',
+    databaseURL: 'https://petspector-d3e39-default-rtdb.firebaseio.com',
     storageBucket: 'petspector-d3e39.firebasestorage.app',
   );
 
@@ -63,7 +65,9 @@ class DefaultFirebaseOptions {
     appId: '1:96102123175:ios:8922b658974ac57a94fd82',
     messagingSenderId: '96102123175',
     projectId: 'petspector-d3e39',
+    databaseURL: 'https://petspector-d3e39-default-rtdb.firebaseio.com',
     storageBucket: 'petspector-d3e39.firebasestorage.app',
+    iosClientId: '96102123175-ukqk755luo03t9tgu3kclk83mopv3bf2.apps.googleusercontent.com',
     iosBundleId: 'com.jmprz.petspector',
   );
 
@@ -72,7 +76,9 @@ class DefaultFirebaseOptions {
     appId: '1:96102123175:ios:8922b658974ac57a94fd82',
     messagingSenderId: '96102123175',
     projectId: 'petspector-d3e39',
+    databaseURL: 'https://petspector-d3e39-default-rtdb.firebaseio.com',
     storageBucket: 'petspector-d3e39.firebasestorage.app',
+    iosClientId: '96102123175-ukqk755luo03t9tgu3kclk83mopv3bf2.apps.googleusercontent.com',
     iosBundleId: 'com.jmprz.petspector',
   );
 
@@ -82,7 +88,9 @@ class DefaultFirebaseOptions {
     messagingSenderId: '96102123175',
     projectId: 'petspector-d3e39',
     authDomain: 'petspector-d3e39.firebaseapp.com',
+    databaseURL: 'https://petspector-d3e39-default-rtdb.firebaseio.com',
     storageBucket: 'petspector-d3e39.firebasestorage.app',
     measurementId: 'G-S5LNJSJT1S',
   );
+
 }
