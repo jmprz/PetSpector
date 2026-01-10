@@ -13,7 +13,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // Global variable to store the list of available cameras
 List<CameraDescription> cameras = [];
-
+bool isFirebaseSupported = false;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -24,14 +24,13 @@ Future<void> main() async {
     debugPrint("Warning: .env file not found: $e");
   }
 
-  // 2. Firebase Check
+ // Update the check
   if (!Platform.isLinux) {
     try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      isFirebaseSupported = true; // Mark as true ONLY if successful
     } catch (e) {
-      debugPrint("Firebase init failed: $e");
+      print("Firebase failed: $e");
     }
   }
 
