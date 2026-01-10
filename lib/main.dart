@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'screens/signup_screen.dart';
@@ -24,10 +25,14 @@ Future<void> main() async {
     // Continue execution - breed_detector and mood_detector will handle missing API key
   }
 
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+// ONLY initialize Firebase if NOT on Linux
+  if (!Platform.isLinux) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } else {
+    print("Skipping Firebase initialization for Linux testing.");
+  }
 
   
   // Initialize cameras (needed for CamScanScreen)
