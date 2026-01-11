@@ -2,12 +2,12 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "PetSpector",
   "version": "0.1.0",
-  "identifier": "com.petspector.app", 
+  "identifier": "com.petspector.app",
   "build": {
-    "beforeDevCommand": "flutter run -d chrome --web-port 8080 --web-hostname 127.0.0.1",
-    "devUrl": "http://127.0.0.1:8080",
-    "beforeBuildCommand": "flutter build web --release --dart-define=FLUTTER_WEB_RENDERER=canvaskit",
-    "frontendDist": "../build/web"
+  "beforeDevCommand": "flutter run -d chrome --web-port 8080 --web-hostname 127.0.0.1",
+  "devUrl": "http://127.0.0.1:8080",
+  "beforeBuildCommand": "flutter build web --release --dart-define=FLUTTER_WEB_RENDERER=canvaskit",
+  "frontendDist": "../build/web"
   },
   "app": {
     "windows": [
