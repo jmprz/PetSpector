@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:image_picker/image_picker.dart'; // FIX: Missing import for XFile
 
 class MoodDetector {
   late final GenerativeModel _model;
@@ -20,7 +20,7 @@ class MoodDetector {
     }
     
     _model = GenerativeModel(
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.5-flash', // Note: Ensure version is correct (usually 1.5-flash)
       apiKey: apiKey,
       generationConfig: GenerationConfig(
         responseMimeType: 'application/json',
@@ -28,37 +28,38 @@ class MoodDetector {
     );
   }
 
-  Future<Map<String, dynamic>> analyzeVideo(File videoFile) async {
+  Future<Map<String, dynamic>> analyzeVideo(XFile video) async {
+    // FIX: Added missing try block
     try {
-      final Uint8List videoBytes = await videoFile.readAsBytes();
+      final Uint8List bytes = await video.readAsBytes();
 
       final prompt = TextPart("""
-You are a Professional Pet Behavior Analyst specialized in interpreting pet body language and emotional states.
-ALLOWED CATEGORIES: Cat, Dog, Bird, Tortoise.
+        You are a Professional Pet Behavior Analyst specialized in interpreting pet body language and emotional states.
+        ALLOWED CATEGORIES: Cat, Dog, Bird, Tortoise.
 
-ANALYZE THE VIDEO AND DETERMINE:
-- The pet's current mood/emotional state (e.g., Happy, Anxious, Excited, Calm, Playful, Scared, Content, Alert, Stressed, etc.)
-- Body language indicators that support your analysis
-- Behavioral patterns observed in the video
-- Any potential concerns or positive signs
-- Estimated confidence level for your mood assessment (0-100)
+        ANALYZE THE VIDEO AND DETERMINE:
+        - The pet's current mood/emotional state (e.g., Happy, Anxious, Excited, Calm, Playful, Scared, Content, Alert, Stressed, etc.)
+        - Body language indicators that support your analysis
+        - Behavioral patterns observed in the video
+        - Any potential concerns or positive signs
+        - Estimated confidence level for your mood assessment (0-100)
 
-RETURN JSON FORMAT ONLY:
-{
-  "status": "success",
-  "mood": "Primary Mood State",
-  "confidence": 85,
-  "bodyLanguage": "Description of key body language indicators",
-  "behaviorAnalysis": "Detailed analysis of observed behaviors",
-  "concerns": "Any potential concerns or if none, state 'No concerns observed'",
-  "positiveSigns": "Positive behavioral indicators",
-  "type": "Dog/Cat/Bird/Tortoise",
-  "recommendations": "Suggestions based on the observed mood and behavior"
-}
-""");
+        RETURN JSON FORMAT ONLY:
+        {
+          "status": "success",
+          "mood": "Primary Mood State",
+          "confidence": 85,
+          "bodyLanguage": "...",
+          "behaviorAnalysis": "...",
+          "concerns": "...",
+          "positiveSigns": "...",
+          "type": "Dog",
+          "recommendations": "..."
+        }
+      """);
 
       final content = [
-        Content.multi([prompt, DataPart('video/mp4', videoBytes)])
+        Content.multi([prompt, DataPart('video/mp4', bytes)]) // FIX: Changed videoBytes to bytes
       ];
 
       final response = await _model.generateContent(content);
@@ -75,39 +76,35 @@ RETURN JSON FORMAT ONLY:
     }
   }
 
-  // For image-based mood analysis (fallback)
-  Future<Map<String, dynamic>> analyzeImage(File imageFile) async {
+  Future<Map<String, dynamic>> analyzeImage(XFile image) async {
+    // FIX: Added missing try block
     try {
-      final Uint8List imageBytes = await imageFile.readAsBytes();
+      final Uint8List bytes = await image.readAsBytes();
 
       final prompt = TextPart("""
-You are a Professional Pet Behavior Analyst specialized in interpreting pet body language and emotional states from images.
-ALLOWED CATEGORIES: Cat, Dog, Bird, Tortoise.
+        You are a Professional Pet Behavior Analyst specialized in interpreting pet body language and emotional states from images.
+        ALLOWED CATEGORIES: Cat, Dog, Bird, Tortoise.
 
-ANALYZE THE IMAGE AND DETERMINE:
-- The pet's current mood/emotional state (e.g., Happy, Anxious, Excited, Calm, Playful, Scared, Content, Alert, Stressed, etc.)
-- Body language indicators visible in the image
-- Behavioral cues observed
-- Any potential concerns or positive signs
-- Estimated confidence level for your mood assessment (0-100)
+        ANALYZE THE IMAGE AND DETERMINE:
+        - The pet's current mood/emotional state.
+        - Body language indicators, Behavioral cues, and Confidence (0-100).
 
-RETURN JSON FORMAT ONLY:
-{
-  "status": "success",
-  "mood": "Primary Mood State",
-  "confidence": 75,
-  "bodyLanguage": "Description of key body language indicators visible",
-  "behaviorAnalysis": "Analysis of observed behavioral cues",
-  "concerns": "Any potential concerns or if none, state 'No concerns observed'",
-  "positiveSigns": "Positive behavioral indicators",
-  "type": "Dog/Cat/Bird/Tortoise",
-  "recommendations": "Suggestions based on the observed mood",
-  "note": "Analysis based on single image - video analysis provides more accurate results"
-}
-""");
+        RETURN JSON FORMAT ONLY:
+        {
+          "status": "success",
+          "mood": "...",
+          "confidence": 75,
+          "bodyLanguage": "...",
+          "behaviorAnalysis": "...",
+          "concerns": "...",
+          "positiveSigns": "...",
+          "type": "Cat",
+          "recommendations": "..."
+        }
+      """);
 
       final content = [
-        Content.multi([prompt, DataPart('image/jpeg', imageBytes)])
+        Content.multi([prompt, DataPart('image/jpeg', bytes)]) // FIX: Changed imageBytes to bytes
       ];
 
       final response = await _model.generateContent(content);
@@ -138,4 +135,3 @@ RETURN JSON FORMAT ONLY:
     };
   }
 }
-

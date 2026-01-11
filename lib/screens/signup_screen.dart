@@ -147,100 +147,140 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
+@override
+Widget build(BuildContext context) {
+  final double screenWidth = MediaQuery.of(context).size.width;
+  // Determine if we are on a large screen
+  final bool isLargeScreen = screenWidth > 600;
+
+  return Scaffold(
+    backgroundColor: isLargeScreen ? const Color(0xFFF0F7F9) : Colors.white,
+    body: SafeArea(
+      child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 30),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(
-                  Icons.arrow_back_ios,
-                  color: Color(0xFF3F7795),
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                "Create Account",
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF3F7795),
-                ),
-              ),
-              const Text(
-                "Fill in your details to get started",
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 30),
-
-              // First & Last Name Row
-              const SizedBox(height: 15),
-              TextField(
-                controller: _firstNameController,
-                decoration: _inputStyle("First Name", Icons.person_outline),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: _lastNameController,
-                decoration: _inputStyle("Last Name", Icons.person_outline),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: _usernameController,
-                decoration: _inputStyle("Username", Icons.alternate_email),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: _emailController,
-                decoration: _inputStyle("Email", Icons.email_outlined),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: _inputStyle("Password", Icons.lock_outline),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: _confirmPasswordController,
-                obscureText: true,
-                decoration: _inputStyle("Confirm Password", Icons.lock_reset),
-              ),
-
-              const SizedBox(height: 30),
-
-              isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: signUp,
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 55),
-                        backgroundColor: const Color(0xFF3F7795),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                      ),
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+          child: Container(
+            // Constrain the width of the form on large screens
+            constraints: const BoxConstraints(maxWidth: 500),
+            margin: EdgeInsets.all(isLargeScreen ? 24 : 0),
+            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 30),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(isLargeScreen ? 20 : 0),
+              boxShadow: isLargeScreen
+                  ? [BoxShadow(color: Colors.black12, blurRadius: 15, offset: Offset(0, 5))]
+                  : null,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Back Button with Mouse Pointer
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new,
+                      color: Color(0xFF3F7795),
                     ),
-              const SizedBox(height: 20),
-            ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  "Create Account",
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF3F7795),
+                  ),
+                ),
+                const Text(
+                  "Fill in your details to get started",
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 30),
+
+                // Organized Form Fields
+                _buildResponsiveRow(
+                  isLargeScreen,
+                  TextField(
+                    controller: _firstNameController,
+                    decoration: _inputStyle("First Name", Icons.person_outline),
+                  ),
+                  TextField(
+                    controller: _lastNameController,
+                    decoration: _inputStyle("Last Name", Icons.person_outline),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: _usernameController,
+                  decoration: _inputStyle("Username", Icons.alternate_email),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: _emailController,
+                  decoration: _inputStyle("Email", Icons.email_outlined),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: _inputStyle("Password", Icons.lock_outline),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: _confirmPasswordController,
+                  obscureText: true,
+                  decoration: _inputStyle("Confirm Password", Icons.lock_reset),
+                ),
+
+                const SizedBox(height: 30),
+
+                // Sign Up Button with Mouse Pointer
+                isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: ElevatedButton(
+                          onPressed: signUp,
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 55),
+                            backgroundColor: const Color(0xFF3F7795),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                          ),
+                          child: const Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
+// Helper widget to show fields side-by-side on desktop if desired, 
+// or stacked on mobile. For SignUp, stacking is usually cleaner, 
+// but we'll use a simple wrapper here for consistency.
+Widget _buildResponsiveRow(bool isLarge, Widget left, Widget right) {
+  return Column(
+    children: [
+      left,
+      const SizedBox(height: 15),
+      right,
+    ],
+  );
+}
 }

@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart'; 
 import '../main.dart';
 import '../utils/mood_detector.dart';
 
@@ -20,11 +21,12 @@ class _MoodDetectorScreenState extends State<MoodDetectorScreen> {
   Future<void>? _initializeControllerFuture;
   final MoodDetector _moodDetector = MoodDetector();
   int _selectedCameraIndex = 0;
-  File? _selectedVideo;
-  File? _selectedImage;
+  
+  // FIX: Use XFile for platform compatibility
+  XFile? _selectedXFile;
   bool _isProcessing = false;
   bool _isRecording = false;
-  bool _isVideoMode = true; // Default to video mode
+  bool _isVideoMode = true;
 
   @override
   void initState() {
@@ -39,29 +41,25 @@ void dispose() {
 }
 
 void _initializeCamera(int index) async {
-  if (cameras.isEmpty) return;
-  
-  // Dispose existing controller before starting a new one
-  if (_cameraController != null) {
-    await _cameraController!.dispose();
+    if (cameras.isEmpty) return;
+    if (_cameraController != null) await _cameraController!.dispose();
+
+    _cameraController = CameraController(
+      cameras[index],
+      ResolutionPreset.high,
+      enableAudio: true,
+    );
+
+    try {
+      _initializeControllerFuture = _cameraController!.initialize();
+      await _initializeControllerFuture;
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint("Camera Init Error: $e");
+    }
   }
 
-  _cameraController = CameraController(
-    cameras[index],
-    ResolutionPreset.high,
-    enableAudio: true, // Try setting this to true; some devices crash if false but trying to record video
-  );
-
-  try {
-    _initializeControllerFuture = _cameraController!.initialize();
-    await _initializeControllerFuture;
-    if (mounted) setState(() {});
-  } catch (e) {
-    debugPrint("Camera Init Error: $e");
-  }
-}
-
-  void _toggleCamera() {
+ void _toggleCamera() {
     if (cameras.length < 2) return;
     _selectedCameraIndex = _selectedCameraIndex == 0 ? 1 : 0;
     _initializeCamera(_selectedCameraIndex);
@@ -88,138 +86,108 @@ void _initializeCamera(int index) async {
     );
   }
 }
-  Future<void> _stopRecording() async {
-    if (_cameraController == null || !_cameraController!.value.isRecordingVideo) {
-      return;
-    }
+ Future<void> _stopRecording() async {
+    if (_cameraController == null || !_cameraController!.value.isRecordingVideo) return;
 
     try {
       final XFile videoFile = await _cameraController!.stopVideoRecording();
       setState(() {
         _isRecording = false;
-        _selectedVideo = File(videoFile.path);
+        _selectedXFile = videoFile;
       });
-      await _processVideo(_selectedVideo!);
+      await _processMedia(videoXFile: videoFile);
     } catch (e) {
-      debugPrint("Error stopping video recording: $e");
+      debugPrint("Error stopping recording: $e");
       setState(() => _isRecording = false);
     }
   }
 
-  Future<void> _processVideo(File videoFile) async {
-    setState(() {
-      _isProcessing = true;
-    });
+
+Future<void> _processMedia({XFile? videoXFile, XFile? imageXFile}) async {
+    setState(() => _isProcessing = true);
+    final bool isImage = imageXFile != null;
+    final XFile activeFile = isImage ? imageXFile : videoXFile!;
 
     try {
-      final Map<String, dynamic> result = await _moodDetector.analyzeVideo(videoFile);
+      // Analyze using the XFile-compatible detector
+      final Map<String, dynamic> result = isImage 
+          ? await _moodDetector.analyzeImage(activeFile)
+          : await _moodDetector.analyzeVideo(activeFile);
 
       if (result['status'] != 'error') {
-        await _saveMoodAnalysisToHistory(result, videoFile);
+        await _saveMoodAnalysisToHistory(result, activeFile, isImage: isImage);
       }
 
-      if (mounted) {
-        _showResultBottomSheet(result);
-      }
+      if (mounted) _showResultBottomSheet(result);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: ${e.toString()}")),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
   }
 
-  Future<void> _processImage(File imageFile) async {
-    setState(() {
-      _isProcessing = true;
-      _selectedImage = imageFile;
-    });
-
-    try {
-      final Map<String, dynamic> result = await _moodDetector.analyzeImage(imageFile);
-
-      if (result['status'] != 'error') {
-        // Save image-based analysis
-        await _saveMoodAnalysisToHistory(result, imageFile, isImage: true);
-      }
-
-      if (mounted) {
-        _showResultBottomSheet(result);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: ${e.toString()}")),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
 
 Future<void> _saveMoodAnalysisToHistory(
-  Map<String, dynamic> result,
-  File mediaFile, {
-  bool isImage = false,
-}) async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return;
+    Map<String, dynamic> result,
+    XFile xFile, {
+    bool isImage = false,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-  try {
-    // 1. Upload the file to Firebase Storage
-    String folder = isImage ? 'mood_images' : 'mood_videos';
-    String extension = isImage ? 'jpg' : 'mp4';
-    String fileName = '$folder/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.$extension';
+    try {
+      final Uint8List bytes = await xFile.readAsBytes();
+      String folder = isImage ? 'mood_images' : 'mood_videos';
+      String extension = isImage ? 'jpg' : 'mp4';
+      String fileName = '$folder/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.$extension';
 
-    UploadTask uploadTask = FirebaseStorage.instance
-        .ref()
-        .child(fileName)
-        .putFile(mediaFile);
-        
-    TaskSnapshot snapshot = await uploadTask;
-    String mediaUrl = await snapshot.ref.getDownloadURL();
+     UploadTask uploadTask = FirebaseStorage.instance
+    .ref()
+    .child(fileName)
+    .putData(
+      bytes, 
+      SettableMetadata(
+        contentType: isImage ? 'image/jpeg' : 'video/mp4',
+        // Adding this helps some browsers/Electron wrappers handle the upload better
+        customMetadata: {'userId': user.uid}, 
+      ),
+    );
+          
+      TaskSnapshot snapshot = await uploadTask;
+      String mediaUrl = await snapshot.ref.getDownloadURL();
 
-    // 2. Save the metadata to Firestore
-    await FirebaseFirestore.instance.collection('mood_analysis').add({
-      'userId': user.uid,
-      'mood': result['mood'] ?? 'Unknown',
-      'confidence': result['confidence'] ?? 0,
-      'bodyLanguage': result['bodyLanguage'] ?? 'No data',
-      'behaviorAnalysis': result['behaviorAnalysis'] ?? 'No data',
-      'concerns': result['concerns'] ?? 'No concerns observed',
-      'positiveSigns': result['positiveSigns'] ?? 'None detected',
-      'type': result['type'] ?? 'Unknown',
-      'recommendations': result['recommendations'] ?? 'No recommendations',
-      'mediaUrl': mediaUrl, // This link lets you view the video/image later
-      'isVideo': !isImage,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
-    
-    debugPrint("✅ Mood analysis saved successfully!");
-  } catch (e) {
-    debugPrint("❌ Failed to save mood analysis: $e");
-    // Optionally show a small toast or snackbar to the user
-  }
-}
-
-  Future<void> _pickVideoFromGallery() async {
-    final picker = ImagePicker();
-    final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
-    if (video != null) {
-      await _processVideo(File(video.path));
+      await FirebaseFirestore.instance.collection('mood_analysis').add({
+        'userId': user.uid,
+        'mood': result['mood'] ?? 'Unknown',
+        'confidence': result['confidence'] ?? 0,
+        'bodyLanguage': result['bodyLanguage'] ?? 'No data',
+        'behaviorAnalysis': result['behaviorAnalysis'] ?? 'No data',
+        'concerns': result['concerns'] ?? 'No concerns observed',
+        'positiveSigns': result['positiveSigns'] ?? 'None detected',
+        'recommendations': result['recommendations'] ?? 'No recommendations',
+        'mediaUrl': mediaUrl,
+        'isVideo': !isImage,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint("❌ Save failed: $e");
     }
+  }
+
+
+
+Future<void> _pickVideoFromGallery() async {
+    final XFile? video = await ImagePicker().pickVideo(source: ImageSource.gallery);
+    if (video != null) await _processMedia(videoXFile: video);
   }
 
   Future<void> _pickImageFromGallery() async {
-    final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      await _processImage(File(image.path));
-    }
+    final XFile? image = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (image != null) await _processMedia(imageXFile: image);
   }
+
 
   void _showResultBottomSheet(Map<String, dynamic> data) {
     final bool isError = data['status'] == 'error';
@@ -465,115 +433,296 @@ Future<void> _saveMoodAnalysisToHistory(
     return const Color(0xFF3F7795);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: Text(
-          _isVideoMode ? "Mood Detector (Video)" : "Mood Detector (Image)",
-          style: const TextStyle(color: Colors.white),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(_isVideoMode ? Icons.image : Icons.videocam, color: Colors.white),
-            onPressed: () {
-              setState(() => _isVideoMode = !_isVideoMode);
-            },
+void _showHelpModal() {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) => Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
+          const SizedBox(height: 25),
+          const Text(
+            "Scanning Guide",
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 20),
+          _buildHelpRow(Icons.light_mode_outlined, "Good Lighting", "Ensure your pet is in a well-lit area for better accuracy."),
+          _buildHelpRow(Icons.center_focus_weak, "Center Your Pet", "Keep the pet within the corner brackets for a clear scan."),
+          _buildHelpRow(Icons.timer_outlined, "Stay Still", "Hold your phone steady while taking the video."),
+          const SizedBox(height: 30),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3F7795),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Got it!", style: TextStyle(color: Colors.white, fontSize: 16)),
+            ),
+          ),
+          const SizedBox(height: 20),
         ],
       ),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: FutureBuilder(
-              future: _initializeControllerFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done &&
-                    _cameraController != null) {
-                  return CameraPreview(_cameraController!);
-                }
-                return const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                );
-              },
-            ),
+    ),
+  );
+}
+
+Widget _buildHelpRow(IconData icon, String title, String desc) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 20),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          backgroundColor: const Color(0xFF3F7795).withOpacity(0.1),
+          child: Icon(icon, color: const Color(0xFF3F7795), size: 20),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(desc, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+            ],
           ),
-          Center(
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white54, width: 2),
-                borderRadius: BorderRadius.circular(30),
+        ),
+      ],
+    ),
+  );
+}
+
+
+@override
+Widget build(BuildContext context) {
+  final double screenWidth = MediaQuery.of(context).size.width;
+  final double scaleFactor = screenWidth > 600 ? 1.2 : 1.0;
+
+  return Scaffold(
+    backgroundColor: Colors.transparent, // Background of the whole window
+    body: Center(
+      child: Container(
+        // This container IS the camera screen
+        constraints: const BoxConstraints(maxWidth: 1200),
+        color: Colors.black,
+        child: Stack(
+          children: [
+            // 1. Camera Preview
+            Positioned.fill(
+              child: FutureBuilder(
+                future: _initializeControllerFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done &&
+                      _cameraController != null) {
+                    return CameraPreview(_cameraController!);
+                  }
+                  return const Center(child: CircularProgressIndicator(color: Colors.white));
+                },
               ),
             ),
-          ),
-          if (_isProcessing)
-            Container(
-              color: Colors.black54,
-              child: const Center(child: CircularProgressIndicator()),
-            ),
-          Positioned(
-            bottom: 40,
-            left: 0,
-            right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    _isVideoMode ? Icons.video_library : Icons.photo_library,
-                    color: Colors.white,
-                    size: 30,
+
+            // 2. Overlay Controls (The "Internal" AppBar)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 10,
+              left: 10,
+              right: 10,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Back Button
+                  _buildCircleAction(
+                    icon: Icons.arrow_back_ios_new,
+                    onTap: () => Navigator.pop(context),
+                    scale: 0.9, // Slightly smaller
                   ),
-                  onPressed: _isVideoMode ? _pickVideoFromGallery : _pickImageFromGallery,
-                ),
-                GestureDetector(
-                  onTap: _isRecording ? _stopRecording : (_isVideoMode ? _startRecording : () async {
-                    if (_cameraController != null && _cameraController!.value.isInitialized) {
-                      final XFile image = await _cameraController!.takePicture();
-                      await _processImage(File(image.path));
-                    }
-                  }),
-                  child: Container(
-                    height: 70,
-                    width: 70,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _isRecording ? Colors.red : Colors.white,
-                        width: 4,
+                  
+                  // Center Title
+                  Expanded(
+                    child: Text(
+                      _isVideoMode ? "Mood Detector (Video)" : "Mood Detector (Image)",
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        shadows: [Shadow(blurRadius: 10, color: Colors.black)],
                       ),
-                      color: _isRecording ? Colors.red.withOpacity(0.3) : Colors.white24,
                     ),
-                    child: _isRecording
-                        ? const Icon(Icons.stop, color: Colors.white, size: 30)
-                        : Icon(
-                            _isVideoMode ? Icons.videocam : Icons.camera_alt,
-                            color: Colors.white,
-                            size: 30,
-                          ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.flip_camera_ios,
-                    color: Colors.white,
-                    size: 30,
+
+                  // Right Actions (Mode Toggle & Info)
+                  Row(
+                    children: [
+                      _buildCircleAction(
+                        icon: _isVideoMode ? Icons.image : Icons.videocam,
+                        onTap: () => setState(() => _isVideoMode = !_isVideoMode),
+                        scale: 0.9,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildCircleAction(
+                        icon: Icons.info_outline,
+                        onTap: _showHelpModal,
+                        scale: 0.9,
+                      ),
+                    ],
                   ),
-                  onPressed: _toggleCamera,
-                ),
-              ],
+                ],
+              ),
             ),
+
+            // 3. Scanning Frame
+            Center(
+              child: SizedBox(
+                width: 300 * scaleFactor,
+                height: 300 * scaleFactor,
+                child: Stack(
+                  children: [
+                    _buildCorner(top: true, left: true, scale: scaleFactor),
+                    _buildCorner(top: true, left: false, scale: scaleFactor),
+                    _buildCorner(top: false, left: true, scale: scaleFactor),
+                    _buildCorner(top: false, left: false, scale: scaleFactor),
+                  ],
+                ),
+              ),
+            ),
+
+            if (_isProcessing)
+              Container(
+                color: Colors.black54,
+                child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+              ),
+
+            // 4. Bottom Controls
+            Positioned(
+              bottom: 50,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildCircleAction(
+                    icon: _isVideoMode ? Icons.video_library : Icons.photo_library,
+                    onTap: _isVideoMode ? _pickVideoFromGallery : _pickImageFromGallery,
+                    scale: scaleFactor,
+                  ),
+                  _buildShutterButton(scaleFactor), // Extracted shutter logic
+                  _buildCircleAction(
+                    icon: Icons.flip_camera_ios_outlined,
+                    onTap: _toggleCamera,
+                    scale: scaleFactor,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+// Helper to keep the build method clean
+Widget _buildShutterButton(double scale) {
+  return GestureDetector(
+    onTap: _isRecording ? _stopRecording : (_isVideoMode ? _startRecording : () async {
+      if (_cameraController != null && _cameraController!.value.isInitialized) {
+        final XFile image = await _cameraController!.takePicture();
+        await _processMedia(imageXFile: image);
+      }
+    }),
+    child: Container(
+      height: 80 * scale,
+      width: 80 * scale,
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: _isRecording ? Colors.red : Colors.white, width: 3),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: _isRecording ? Colors.red : Colors.white,
+          shape: _isRecording ? BoxShape.rectangle : BoxShape.circle,
+          borderRadius: _isRecording ? BorderRadius.circular(8) : null,
+        ),
+      ),
+    ),
+  );
+}
+
+ Widget _buildCorner({
+    required bool top,
+    required bool left,
+    required double scale,
+  }) {
+    final double cornerSize =
+        25.0 * scale; // Slightly smaller for a sharper look
+    const double thickness = 4.0;
+    const Color cornerColor = Colors.white;
+
+    return Positioned(
+      top: top ? 0 : null,
+      bottom: !top ? 0 : null,
+      left: left ? 0 : null,
+      right: !left ? 0 : null,
+      child: Container(
+        width: cornerSize,
+        height: cornerSize,
+        decoration: BoxDecoration(
+          border: Border(
+            top: top
+                ? const BorderSide(color: cornerColor, width: thickness)
+                : BorderSide.none,
+            bottom: !top
+                ? const BorderSide(color: cornerColor, width: thickness)
+                : BorderSide.none,
+            left: left
+                ? const BorderSide(color: cornerColor, width: thickness)
+                : BorderSide.none,
+            right: !left
+                ? const BorderSide(color: cornerColor, width: thickness)
+                : BorderSide.none,
           ),
-        ],
+        ),
       ),
     );
   }
+
+ Widget _buildCircleAction({
+  required IconData icon,
+  required VoidCallback onTap,
+  required double scale,
+}) {
+  return MouseRegion(
+    cursor: SystemMouseCursors.click, // <--- Add this
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 50 * scale,
+        width: 50 * scale,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 26 * scale),
+      ),
+    ),
+  );
+}
 }
 

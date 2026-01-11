@@ -232,94 +232,148 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Center(
+
+// 1. Helper method (Removed @override)
+Widget _buildTextField({
+  required TextEditingController controller,
+  required String label,
+  required IconData icon,
+  required double scale,
+  bool isPassword = false,
+}) {
+  return TextField(
+    controller: controller,
+    obscureText: isPassword ? _obscurePassword : false,
+    style: TextStyle(fontSize: 16 * scale),
+    decoration: InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(fontSize: 14 * scale),
+      prefixIcon: Icon(icon, color: const Color(0xFF3F7795), size: 22 * scale),
+      filled: true,
+      fillColor: const Color(0xFFF0F7F9),
+      contentPadding: EdgeInsets.symmetric(vertical: 18 * scale, horizontal: 15 * scale),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide.none,
+      ),
+      suffixIcon: isPassword 
+          ? IconButton(
+              icon: Icon(
+                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                size: 20 * scale,
+              ),
+              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+            ) 
+          : null,
+    ),
+  );
+}
+
+// 2. Main Build Method
+@override
+Widget build(BuildContext context) {
+  final double screenWidth = MediaQuery.of(context).size.width;
+  // Scale text and icons slightly on larger screens
+  final double scaleFactor = screenWidth > 600 ? 1.15 : 1.0;
+
+  return Scaffold(
+    backgroundColor: Colors.white,
+    body: SafeArea(
+      child: Center(
+        child: Container(
+          // Limit form width to 450px for a professional Web look
+          constraints: const BoxConstraints(maxWidth: 450), 
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 30),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 1. Logo and Branding
-                Image.asset('assets/images/ps_icon.png', height: 100),
-                const SizedBox(height: 20),
-                const Text(
+                // Logo and Branding
+                Image.asset('assets/images/ps_icon.png', height: 100 * scaleFactor),
+                SizedBox(height: 20 * scaleFactor),
+                Text(
                   "PetSpector",
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF3F7795)),
+                  style: TextStyle(
+                    fontSize: 32 * scaleFactor, 
+                    fontWeight: FontWeight.bold, 
+                    color: const Color(0xFF3F7795),
+                  ),
                 ),
-                const Text("Login to your account", style: TextStyle(color: Colors.grey)),
-                const SizedBox(height: 40),
+                Text(
+                  "Login to your account", 
+                  style: TextStyle(color: Colors.grey, fontSize: 14 * scaleFactor),
+                ),
+                SizedBox(height: 40 * scaleFactor),
 
-                // 2. Styled TextFields
-                TextField(
+                // Styled TextFields
+                _buildTextField(
                   controller: _emailController,
-                  decoration: InputDecoration(
-                    labelText: "Email",
-                    prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF3F7795)),
-                    filled: true,
-                    fillColor: const Color(0xFFF0F7F9),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
+                  label: "Email",
+                  icon: Icons.email_outlined,
+                  scale: scaleFactor,
                 ),
-                const SizedBox(height: 15),
-                TextField(
+                SizedBox(height: 15 * scaleFactor),
+                _buildTextField(
                   controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: "Password",
-                    prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF3F7795)),
-                    filled: true,
-                    fillColor: const Color(0xFFF0F7F9),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: BorderSide.none,
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
+                  label: "Password",
+                  icon: Icons.lock_outline,
+                  isPassword: true,
+                  scale: scaleFactor,
                 ),
 
-                // 3. Forgot Password
+                // Forgot Password
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: _resetPassword,
-                    child: const Text("Forgot Password?", style: TextStyle(color: Color(0xFF3F7795), fontWeight: FontWeight.w600)),
+                    child: Text(
+                      "Forgot Password?", 
+                      style: TextStyle(
+                        color: const Color(0xFF3F7795), 
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14 * scaleFactor,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: 20 * scaleFactor),
 
-                // 4. Action Buttons
+                // Action Buttons
                 _isLoading
                     ? const CircularProgressIndicator()
                     : ElevatedButton(
                         onPressed: _loginWithEmail,
                         style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 55),
+                          minimumSize: Size(double.infinity, 55 * scaleFactor),
                           backgroundColor: const Color(0xFF3F7795),
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         ),
-                        child: const Text("Login", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        child: Text(
+                          "Login", 
+                          style: TextStyle(fontSize: 18 * scaleFactor, fontWeight: FontWeight.bold),
+                        ),
                       ),
 
-                const SizedBox(height: 20),
+                SizedBox(height: 20 * scaleFactor),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Don't have an account? "),
+                    Text(
+                      "Don't have an account? ",
+                      style: TextStyle(fontSize: 14 * scaleFactor),
+                    ),
                     GestureDetector(
                       onTap: () => Navigator.pushNamed(context, '/signup'),
-                      child: const Text("Sign Up", style: TextStyle(color: Color(0xFF3F7795), fontWeight: FontWeight.bold)),
+                      child: Text(
+                        "Sign Up", 
+                        style: TextStyle(
+                          color: const Color(0xFF3F7795), 
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14 * scaleFactor,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -328,6 +382,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
