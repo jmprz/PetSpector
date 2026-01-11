@@ -549,6 +549,14 @@ Future<void> _handleDelete(Map<String, dynamic> data) async {
         data['result'] ?? 'Unknown Breed',
         style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
       ),
+        Text(
+          (data['type'] ?? 'Pet').toString().toUpperCase(),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.blueGrey[300],
+          ),
+        ),
       if (data['description'] != null)
         Padding(
           padding: const EdgeInsets.only(top: 8.0),

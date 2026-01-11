@@ -160,130 +160,182 @@ class _CamScanScreenState extends State<CamScanScreen> {
     );
   }
 
- Widget _buildSuccessView(Map<String, dynamic> data, XFile xFile) {
-  // 1. Setup Data and Variables
-  final int accuracyInt = data['accuracy'] ?? 0;
-  
-  // Extract matches or create default from top result
-  List<dynamic> matches = data['matches'] ?? [
-    {'breed': data['breed'], 'percentage': data['accuracy'], 'color': '#3F7795'}
-  ];
+  Widget _buildSuccessView(Map<String, dynamic> data, XFile xFile) {
+    // 1. Setup Data and Variables
+    final int accuracyInt = data['accuracy'] ?? 0;
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      // Captured Image Preview
-      Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: kIsWeb
-              ? Image.network(xFile.path, height: 250, width: double.infinity, fit: BoxFit.cover)
-              : Image.file(File(xFile.path), height: 250, width: double.infinity, fit: BoxFit.cover),
-        ),
-      ),
+    // Extract matches or create default from top result
+    List<dynamic> matches =
+        data['matches'] ??
+        [
+          {
+            'breed': data['breed'],
+            'percentage': data['accuracy'],
+            'color': '#3F7795',
+          },
+        ];
 
-      // Breed Title and Type
-      Text(
-        data['breed'] ?? 'Unknown Breed',
-        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-      ),
-      Text(
-        (data['type'] ?? 'Pet').toString().toUpperCase(),
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: Colors.blueGrey[300],
-        ),
-      ),
-
-      if (data['description'] != null)
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Captured Image Preview
         Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: Text(
-            data['description'],
-            style: TextStyle(
-              fontSize: 15,
-              color: Colors.grey[700],
-              fontStyle: FontStyle.italic,
-              height: 1.4, // Improves readability
+          padding: const EdgeInsets.only(bottom: 20),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: kIsWeb
+                ? Image.network(
+                    xFile.path,
+                    height: 250,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  )
+                : Image.file(
+                    File(xFile.path),
+                    height: 250,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+          ),
+        ),
+
+        // Breed Title and Type
+        Text(
+          data['breed'] ?? 'Unknown Breed',
+          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+        ),
+        Text(
+          (data['type'] ?? 'Pet').toString().toUpperCase(),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.blueGrey[300],
+          ),
+        ),
+
+        if (data['description'] != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(
+              data['description'],
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey[700],
+                fontStyle: FontStyle.italic,
+                height: 1.4, // Improves readability
+              ),
+            ),
+          ),
+
+        const SizedBox(height: 30),
+
+        // 2. DONUT CHART (PieChart with Center Text)
+        Center(
+          child: SizedBox(
+            height: 200,
+            child: Stack(
+              // Wrap in a Stack to layer text on top
+              alignment: Alignment.center,
+              children: [
+                PieChart(
+                  PieChartData(
+                    sectionsSpace: 2,
+                    centerSpaceRadius: 60,
+                    sections: matches.map((m) {
+                      final colorStr = (m['color'] as String).replaceFirst(
+                        '#',
+                        '0xFF',
+                      );
+                      return PieChartSectionData(
+                        color: Color(int.parse(colorStr)),
+                        value: (m['percentage'] as num).toDouble(),
+                        title: '',
+                        radius: 35,
+                      );
+                    }).toList(),
+                  ),
+                ),
+                // The Center Text
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "$accuracyInt%", // Your accuracy variable
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF3F7795),
+                      ),
+                    ),
+                    Text(
+                      "Match",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
-      
-      const SizedBox(height: 30),
 
-      // 2. DONUT CHART (PieChart)
-      Center(
-        child: SizedBox(
-          height: 200,
-          child: PieChart(
-            PieChartData(
-              sectionsSpace: 2,
-              centerSpaceRadius: 60,
-              sections: matches.map((m) {
-                final colorStr = (m['color'] as String).replaceFirst('#', '0xFF');
-                return PieChartSectionData(
-                  color: Color(int.parse(colorStr)),
-                  value: (m['percentage'] as num).toDouble(),
-                  title: '', 
-                  radius: 35, // Adjust thickness of the ring
-                );
-              }).toList(),
+        const SizedBox(height: 30),
+
+        // 3. BREED ANALYSIS LIST
+        const Text(
+          "Breed Analysis",
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+
+        // The match cards
+        ...matches.map((m) => _buildBreedMatchTile(m)).toList(),
+
+        const SizedBox(height: 25),
+
+        // 4. INFORMATION CARDS
+        _buildInfoCard(
+          "Common Allergies",
+          Icons.warning_amber_rounded,
+          const Color(0xFFFFF4F2),
+          Colors.redAccent,
+          Text(data['allergies'] ?? "No data available."),
+        ),
+        const SizedBox(height: 16),
+        _buildInfoCard(
+          "Care Tips",
+          Icons.lightbulb_outline_rounded,
+          const Color(0xFFF0F9F1),
+          Colors.green,
+          Text(data['care'] ?? "No data available."),
+        ),
+
+        const SizedBox(height: 30),
+
+        // Done Button
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              backgroundColor: const Color(0xFF3F7795),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              "Done",
+              style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ),
         ),
-      ),
-
-      const SizedBox(height: 30),
-
-      // 3. BREED ANALYSIS LIST
-      const Text(
-        "Breed Analysis",
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-      ),
-      const SizedBox(height: 12),
-      
-      // The match cards
-      ...matches.map((m) => _buildBreedMatchTile(m)).toList(),
-
-      const SizedBox(height: 25),
-
-      // 4. INFORMATION CARDS
-      _buildInfoCard(
-        "Common Allergies",
-        Icons.warning_amber_rounded,
-        const Color(0xFFFFF4F2),
-        Colors.redAccent,
-        Text(data['allergies'] ?? "No data available."),
-      ),
-      const SizedBox(height: 16),
-      _buildInfoCard(
-        "Care Tips",
-        Icons.lightbulb_outline_rounded,
-        const Color(0xFFF0F9F1),
-        Colors.green,
-        Text(data['care'] ?? "No data available."),
-      ),
-      
-      const SizedBox(height: 30),
-      
-      // Done Button
-      SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: () => Navigator.pop(context),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 15),
-            backgroundColor: const Color(0xFF3F7795),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: const Text("Done", style: TextStyle(color: Colors.white, fontSize: 16)),
-        ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
   Widget _buildErrorView(Map<String, dynamic> data) {
     return Column(
@@ -359,214 +411,245 @@ class _CamScanScreenState extends State<CamScanScreen> {
     if (image != null) await _processImage(image); // Pass XFile directly
   }
 
-void _showHelpModal() {
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    builder: (context) => Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          const SizedBox(height: 25),
-          const Text(
-            "Scanning Guide",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          _buildHelpRow(Icons.light_mode_outlined, "Good Lighting", "Ensure your pet is in a well-lit area for better accuracy."),
-          _buildHelpRow(Icons.center_focus_weak, "Center Your Pet", "Keep the pet within the corner brackets for a clear scan."),
-          _buildHelpRow(Icons.timer_outlined, "Stay Still", "Hold your phone steady while taking the photo."),
-          const SizedBox(height: 30),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3F7795),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(vertical: 15),
-              ),
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Got it!", style: TextStyle(color: Colors.white, fontSize: 16)),
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    ),
-  );
-}
-
-Widget _buildHelpRow(IconData icon, String title, String desc) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 20),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        CircleAvatar(
-          backgroundColor: const Color(0xFF3F7795).withOpacity(0.1),
-          child: Icon(icon, color: const Color(0xFF3F7795), size: 20),
+  void _showHelpModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              Text(desc, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
- @override
-Widget build(BuildContext context) {
-  final double screenWidth = MediaQuery.of(context).size.width;
-  final double scaleFactor = screenWidth > 600 ? 1.2 : 1.0;
-
-  return Scaffold(
-    backgroundColor: Colors.transparent, // Pure black for the areas outside the camera feed
-    body: Center(
-      child: Container(
-        // Constrains the camera and UI to a central column on large screens
-        constraints: const BoxConstraints(maxWidth: 1200),
-        color: Colors.black,
-        child: Stack(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // 1. Camera Preview
-            Positioned.fill(
-              child: FutureBuilder(
-                future: _initializeControllerFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.done &&
-                      _cameraController != null) {
-                    return CameraPreview(_cameraController!);
-                  }
-                  return const Center(child: CircularProgressIndicator(color: Colors.white));
-                },
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
-
-            // 2. Custom Header (Replaces AppBar)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 10,
-              left: 15,
-              right: 15,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Back Button with circular transparent background
-                  _buildCircleAction(
-                    icon: Icons.arrow_back_ios_new,
-                    onTap: () => Navigator.pop(context),
-                    scale: 0.85, // Slightly smaller than bottom buttons
-                  ),
-                  
-                  // Screen Title
-                  const Text(
-                    "Breed Detector",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      shadows: [Shadow(blurRadius: 10, color: Colors.black)],
-                    ),
-                  ),
-
-                  // Info Button with circular transparent background
-                  _buildCircleAction(
-                    icon: Icons.info_outline,
-                    onTap: _showHelpModal,
-                    scale: 0.85,
-                  ),
-                ],
-              ),
+            const SizedBox(height: 25),
+            const Text(
+              "Scanning Guide",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
-
-            // 3. Stylized Scanning Frame
-            Center(
-              child: SizedBox(
-                width: 300 * scaleFactor,
-                height: 300 * scaleFactor,
-                child: Stack(
-                  children: [
-                    _buildCorner(top: true, left: true, scale: scaleFactor),
-                    _buildCorner(top: true, left: false, scale: scaleFactor),
-                    _buildCorner(top: false, left: true, scale: scaleFactor),
-                    _buildCorner(top: false, left: false, scale: scaleFactor),
-                  ],
+            const SizedBox(height: 20),
+            _buildHelpRow(
+              Icons.light_mode_outlined,
+              "Good Lighting",
+              "Ensure your pet is in a well-lit area for better accuracy.",
+            ),
+            _buildHelpRow(
+              Icons.center_focus_weak,
+              "Center Your Pet",
+              "Keep the pet within the corner brackets for a clear scan.",
+            ),
+            _buildHelpRow(
+              Icons.timer_outlined,
+              "Stay Still",
+              "Hold your phone steady while taking the photo.",
+            ),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF3F7795),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  "Got it!",
+                  style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
               ),
             ),
-
-            if (_isProcessing)
-              Container(
-                color: Colors.black54,
-                child: const Center(child: CircularProgressIndicator(color: Colors.white)),
-              ),
-
-            // 4. Bottom Controls
-            Positioned(
-              bottom: 50,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildCircleAction(
-                    icon: Icons.photo_library_outlined,
-                    onTap: _pickImageFromGallery,
-                    scale: scaleFactor,
-                  ),
-                  
-                  // Main Shutter Button
-                  GestureDetector(
-                    onTap: _takePicture,
-                    child: Container(
-                      height: 80 * scaleFactor,
-                      width: 80 * scaleFactor,
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                      ),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  _buildCircleAction(
-                    icon: Icons.flip_camera_ios_outlined,
-                    onTap: _toggleCamera,
-                    scale: scaleFactor,
-                  ),
-                ],
-              ),
-            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _buildHelpRow(IconData icon, String title, String desc) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            backgroundColor: const Color(0xFF3F7795).withOpacity(0.1),
+            child: Icon(icon, color: const Color(0xFF3F7795), size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  desc,
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double scaleFactor = screenWidth > 600 ? 1.2 : 1.0;
+
+    return Scaffold(
+      backgroundColor: Colors
+          .transparent, // Pure black for the areas outside the camera feed
+      body: Center(
+        child: Container(
+          // Constrains the camera and UI to a central column on large screens
+          constraints: const BoxConstraints(maxWidth: 1200),
+          color: Colors.black,
+          child: Stack(
+            children: [
+              // 1. Camera Preview
+              Positioned.fill(
+                child: FutureBuilder(
+                  future: _initializeControllerFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.done &&
+                        _cameraController != null) {
+                      return CameraPreview(_cameraController!);
+                    }
+                    return const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    );
+                  },
+                ),
+              ),
+
+              // 2. Custom Header (Replaces AppBar)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 10,
+                left: 15,
+                right: 15,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Back Button with circular transparent background
+                    _buildCircleAction(
+                      icon: Icons.arrow_back_ios_new,
+                      onTap: () => Navigator.pop(context),
+                      scale: 0.85, // Slightly smaller than bottom buttons
+                    ),
+
+                    // Screen Title
+                    const Text(
+                      "Breed Detector",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        shadows: [Shadow(blurRadius: 10, color: Colors.black)],
+                      ),
+                    ),
+
+                    // Info Button with circular transparent background
+                    _buildCircleAction(
+                      icon: Icons.info_outline,
+                      onTap: _showHelpModal,
+                      scale: 0.85,
+                    ),
+                  ],
+                ),
+              ),
+
+              // 3. Stylized Scanning Frame
+              Center(
+                child: SizedBox(
+                  width: 300 * scaleFactor,
+                  height: 300 * scaleFactor,
+                  child: Stack(
+                    children: [
+                      _buildCorner(top: true, left: true, scale: scaleFactor),
+                      _buildCorner(top: true, left: false, scale: scaleFactor),
+                      _buildCorner(top: false, left: true, scale: scaleFactor),
+                      _buildCorner(top: false, left: false, scale: scaleFactor),
+                    ],
+                  ),
+                ),
+              ),
+
+              if (_isProcessing)
+                Container(
+                  color: Colors.black54,
+                  child: const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                ),
+
+              // 4. Bottom Controls
+              Positioned(
+                bottom: 50,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildCircleAction(
+                      icon: Icons.photo_library_outlined,
+                      onTap: _pickImageFromGallery,
+                      scale: scaleFactor,
+                    ),
+
+                    // Main Shutter Button
+                    GestureDetector(
+                      onTap: _takePicture,
+                      child: Container(
+                        height: 80 * scaleFactor,
+                        width: 80 * scaleFactor,
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                        ),
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    _buildCircleAction(
+                      icon: Icons.flip_camera_ios_outlined,
+                      onTap: _toggleCamera,
+                      scale: scaleFactor,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildCorner({
@@ -607,30 +690,28 @@ Widget build(BuildContext context) {
     );
   }
 
- Widget _buildCircleAction({
-  required IconData icon,
-  required VoidCallback onTap,
-  required double scale,
-}) {
-  return MouseRegion(
-    cursor: SystemMouseCursors.click, // <--- Add this
-    child: GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 50 * scale,
-        width: 50 * scale,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          shape: BoxShape.circle,
+  Widget _buildCircleAction({
+    required IconData icon,
+    required VoidCallback onTap,
+    required double scale,
+  }) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click, // <--- Add this
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 50 * scale,
+          width: 50 * scale,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.white, size: 26 * scale),
         ),
-        child: Icon(icon, color: Colors.white, size: 26 * scale),
       ),
-    ),
-  );
+    );
+  }
 }
-}
-
-
 
 Widget _buildBreedMatchTile(Map<String, dynamic> match) {
   final String breedName = match['breed']?.toString() ?? 'Unknown';
@@ -641,18 +722,18 @@ Widget _buildBreedMatchTile(Map<String, dynamic> match) {
 
   // Helper function to launch the search
   Future<void> _launchSearch() async {
-  // Use Uri.https to safely encode the breed name for the URL
-  final Uri url = Uri.https('www.google.com', '/search', {
-    'q': '$breedName pet breed info',
-  });
+    // Use Uri.https to safely encode the breed name for the URL
+    final Uri url = Uri.https('www.google.com', '/search', {
+      'q': '$breedName pet breed info',
+    });
 
-  if (await canLaunchUrl(url)) {
-    await launchUrl(url, mode: LaunchMode.externalApplication);
-  } else {
-    // Fallback if the browser can't be opened
-    debugPrint('Could not launch $url');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      // Fallback if the browser can't be opened
+      debugPrint('Could not launch $url');
+    }
   }
-}
 
   return InkWell(
     onTap: _launchSearch, // Tap to search!
@@ -666,7 +747,7 @@ Widget _buildBreedMatchTile(Map<String, dynamic> match) {
         border: Border.all(color: Colors.grey.shade100),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center, 
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Stack(
             alignment: Alignment.center,
@@ -681,7 +762,7 @@ Widget _buildBreedMatchTile(Map<String, dynamic> match) {
                   backgroundColor: Colors.grey.shade100,
                 ),
               ),
-              Icon(Icons.search, size: 18, color: breedColor.withOpacity(0.6)),
+              Icon(Icons.pets, size: 18, color: breedColor.withOpacity(0.6)),
             ],
           ),
           const SizedBox(width: 15),
@@ -692,7 +773,7 @@ Widget _buildBreedMatchTile(Map<String, dynamic> match) {
                 Text(
                   breedName,
                   style: const TextStyle(
-                    fontWeight: FontWeight.bold, 
+                    fontWeight: FontWeight.bold,
                     fontSize: 15,
                     color: Color(0xFF2D3142),
                   ),
