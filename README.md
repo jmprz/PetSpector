@@ -63,3 +63,7 @@ Strict Filtering: The system rejects non-animal images (e.g., cars, food).
 Domain Limitation: If an animal is detected but not in the five supported categories (e.g., a Lion), the system returns a "Not a supported pet" error.
 
 JSON Structuring: All AI responses are forced into a JSON schema to ensure the Flutter UI remains stable and bug-free.
+
+
+## License
+This project is licensed under the [MIT License](LICENSE).

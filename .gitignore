@@ -46,3 +46,4 @@ app.*.map.json
 
 .env
 android/.kotlin/sessions/kotlin-compiler-14749478946278589319.salive
+assets/env
