@@ -1,1 +1,52 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"petspector-d3e39","appId":"1:96102123175:android:c047d340afff6e4d94fd82","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"petspector-d3e39","configurations":{"android":"1:96102123175:android:c047d340afff6e4d94fd82","ios":"1:96102123175:ios:8922b658974ac57a94fd82","web":"1:96102123175:web:666ae72fd11feff194fd82"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "petspector-d3e39",
+          "appId": "1:96102123175:android:c047d340afff6e4d94fd82",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "petspector-d3e39",
+          "configurations": {
+            "android": "1:96102123175:android:c047d340afff6e4d94fd82",
+            "ios": "1:96102123175:ios:8922b658974ac57a94fd82",
+            "web": "1:96102123175:web:666ae72fd11feff194fd82"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/**",
+        "headers": [
+          {
+            "key": "Permissions-Policy",
+            "value": "camera=(self), microphone=(self), fullscreen=(self)"
+          },
+          {
+            "key": "Feature-Policy",
+            "value": "camera 'self'; microphone 'self'"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

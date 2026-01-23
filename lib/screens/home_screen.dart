@@ -633,7 +633,7 @@ Future<void> _handleDelete(Map<String, dynamic> data) async {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        ...matches.map((m) => _buildBreedMatchTile(m as Map<String, dynamic>)).toList(),
+        ...matches.map((m) => _buildBreedMatchTile(m as Map<String, dynamic>)),
         const SizedBox(height: 25),
       ],
 
@@ -681,7 +681,7 @@ Widget _buildBreedMatchTile(Map<String, dynamic> match) {
   final num percentage = match['percentage'] ?? 0;
 
   // Helper function to launch the search
-  Future<void> _launchSearch() async {
+  Future<void> launchSearch() async {
   // Use Uri.https to safely encode the breed name for the URL
   final Uri url = Uri.https('www.google.com', '/search', {
     'q': '$breedName pet breed info',
@@ -696,7 +696,7 @@ Widget _buildBreedMatchTile(Map<String, dynamic> match) {
 }
 
   return InkWell(
-    onTap: _launchSearch, // Tap to search!
+    onTap: launchSearch, // Tap to search!
     borderRadius: BorderRadius.circular(15),
     child: Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1388,8 +1388,9 @@ Widget _buildBreedMatchTile(Map<String, dynamic> match) {
           child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
             stream: _profileStream(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
+              }
               final data = snapshot.data?.data();
               if (data == null ||
                   (data['firstName'] == null && data['name'] == null)) {

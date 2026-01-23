@@ -43,6 +43,11 @@ dependencies:
 
   fl_chart: ^0.70.0
   url_launcher: ^6.3.1
+  intl: ^0.20.2
+  async: ^2.11.0
+  rxdart: ^0.28.0
+  pdf: ^3.10.8
+  printing: ^5.11.1
 
 dev_dependencies:
   flutter_test:
@@ -57,7 +62,7 @@ flutter:
     - assets/images/ps_icon.png
     - assets/images/ps_logo.png
     - assets/images/google_logo.png
-    - .env
+    - assets/env
 
   fonts:
     - family: Poppins

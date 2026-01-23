@@ -3,7 +3,6 @@ import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart'; 
 import '../main.dart';
@@ -136,7 +135,8 @@ Future<void> _saveMoodAnalysisToHistory(
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    final userProfile = userDoc.data() ?? {};
     try {
       final Uint8List bytes = await xFile.readAsBytes();
       String folder = isImage ? 'mood_images' : 'mood_videos';
@@ -158,19 +158,23 @@ Future<void> _saveMoodAnalysisToHistory(
       TaskSnapshot snapshot = await uploadTask;
       String mediaUrl = await snapshot.ref.getDownloadURL();
 
-      await FirebaseFirestore.instance.collection('mood_analysis').add({
-        'userId': user.uid,
-        'mood': result['mood'] ?? 'Unknown',
-        'confidence': result['confidence'] ?? 0,
-        'bodyLanguage': result['bodyLanguage'] ?? 'No data',
-        'behaviorAnalysis': result['behaviorAnalysis'] ?? 'No data',
-        'concerns': result['concerns'] ?? 'No concerns observed',
-        'positiveSigns': result['positiveSigns'] ?? 'None detected',
-        'recommendations': result['recommendations'] ?? 'No recommendations',
-        'mediaUrl': mediaUrl,
-        'isVideo': !isImage,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+     await FirebaseFirestore.instance.collection('mood_analysis').add({
+  'userId': user.uid,
+  '_type': 'mood', // Add this line to fix the badge!
+  'firstName': userProfile['firstName'] ?? '', // Add for Admin Table
+  'lastName': userProfile['lastName'] ?? '',   // Add for Admin Table
+  'userEmail': user.email ?? '',               // Add for Admin Table
+  'mood': result['mood'] ?? 'Unknown',
+  'confidence': result['confidence'] ?? 0,
+  'bodyLanguage': result['bodyLanguage'] ?? 'No data',
+  'behaviorAnalysis': result['behaviorAnalysis'] ?? 'No data',
+  'concerns': result['concerns'] ?? 'No concerns observed',
+  'positiveSigns': result['positiveSigns'] ?? 'None detected',
+  'recommendations': result['recommendations'] ?? 'No recommendations',
+  'mediaUrl': mediaUrl,
+  'isVideo': !isImage,
+  'timestamp': FieldValue.serverTimestamp(),
+});
     } catch (e) {
       debugPrint("❌ Save failed: $e");
     }

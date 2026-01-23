@@ -34,15 +34,31 @@ class _CamScanScreenState extends State<CamScanScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedCameraIndex = _findBackCamera();
     _initializeCamera(_selectedCameraIndex);
   }
 
-  void _initializeCamera(int index) {
+  int _findBackCamera() {
+    for (int i = 0; i < cameras.length; i++) {
+      if (cameras[i].lensDirection == CameraLensDirection.back) {
+        return i;
+      }
+    }
+    return 0; 
+  }
+
+  Future<void> _initializeCamera(int index) async {
     if (cameras.isEmpty) return;
+
+    // IMPORTANT FOR WEB: Dispose the old controller before creating a new one
+    // This prevents the "Camera already in use" error on Android/iOS
+    if (_cameraController != null) {
+      await _cameraController!.dispose();
+    }
 
     _cameraController = CameraController(
       cameras[index],
-      ResolutionPreset.high,
+      ResolutionPreset.medium, // 'high' can sometimes cause lag/crashes on mobile web
       enableAudio: false,
     );
 
@@ -54,8 +70,14 @@ class _CamScanScreenState extends State<CamScanScreen> {
 
   void _toggleCamera() {
     if (cameras.length < 2) return;
-    _selectedCameraIndex = _selectedCameraIndex == 0 ? 1 : 0;
+    _selectedCameraIndex = (_selectedCameraIndex + 1) % cameras.length;
     _initializeCamera(_selectedCameraIndex);
+  }
+
+  @override
+  void dispose() {
+    _cameraController?.dispose();
+    super.dispose();
   }
 
   // --- CORE LOGIC: PROCESSING & SAVING ---
@@ -95,7 +117,10 @@ class _CamScanScreenState extends State<CamScanScreen> {
     Uint8List bytes,
   ) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user != null) {
+  // 2. Fetch the extra profile info from your 'users' collection
+  final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+  final userData = userDoc.data();
 
     try {
       String fileName =
@@ -122,10 +147,14 @@ class _CamScanScreenState extends State<CamScanScreen> {
         'matches': result['matches'] ?? [],
         'type': result['type'] ?? 'Unknown',
         '_type': 'breed',
+        'userEmail': user.email, // Storing email directly in the scan
+        'firstName': userData?['firstName'] ?? 'Guest', // Storing name directly
+        'lastName': userData?['lastName'] ?? '',
       });
     } catch (e) {
       debugPrint("❌ Failed to save history: $e");
     }
+  }
   }
 
   // --- UI: BOTTOM SHEETS & CARDS ---
@@ -292,7 +321,7 @@ class _CamScanScreenState extends State<CamScanScreen> {
         const SizedBox(height: 12),
 
         // The match cards
-        ...matches.map((m) => _buildBreedMatchTile(m)).toList(),
+        ...matches.map((m) => _buildBreedMatchTile(m)),
 
         const SizedBox(height: 25),
 
@@ -399,8 +428,9 @@ class _CamScanScreenState extends State<CamScanScreen> {
   // --- ACTIONS ---
 
   Future<void> _takePicture() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized)
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
       return;
+    }
     final XFile image = await _cameraController!.takePicture();
     await _processImage(image); // Pass XFile directly
   }
@@ -721,7 +751,7 @@ Widget _buildBreedMatchTile(Map<String, dynamic> match) {
   final num percentage = match['percentage'] ?? 0;
 
   // Helper function to launch the search
-  Future<void> _launchSearch() async {
+  Future<void> launchSearch() async {
     // Use Uri.https to safely encode the breed name for the URL
     final Uri url = Uri.https('www.google.com', '/search', {
       'q': '$breedName pet breed info',
@@ -736,7 +766,7 @@ Widget _buildBreedMatchTile(Map<String, dynamic> match) {
   }
 
   return InkWell(
-    onTap: _launchSearch, // Tap to search!
+    onTap: launchSearch, // Tap to search!
     borderRadius: BorderRadius.circular(15),
     child: Container(
       margin: const EdgeInsets.only(bottom: 12),
